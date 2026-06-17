@@ -441,6 +441,39 @@ app.post('/admin/pedido/:id/status', adminAuth, async (req, res) => {
   res.redirect('/admin/pedido/' + req.params.id);
 });
 
+// Importação em lote de produtos (JSON). Idempotente: pula slugs já existentes.
+app.post('/admin/importar', adminAuth, express.json({ limit: '4mb' }), async (req, res) => {
+  const items = Array.isArray(req.body) ? req.body : (req.body.items || []);
+  let inserted = 0, skipped = 0, errors = 0;
+  const slugify = s => String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,200);
+  for (const p of items) {
+    try {
+      const baseSlug = slugify(p.name || p.slug || 'produto');
+      const slug = p.old_id ? `${baseSlug}-${p.old_id}` : baseSlug;
+      const [existing] = await pool.execute('SELECT id FROM products WHERE slug=?', [slug]);
+      if (existing && existing.length) { skipped++; continue; }
+      await pool.execute(
+        'INSERT INTO products (name, slug, category, description, price, stock, image_url, featured) VALUES (?,?,?,?,?,?,?,?)',
+        [
+          String(p.name||'').slice(0,200),
+          slug,
+          String(p.category||'cama').slice(0,40),
+          String(p.description||'').slice(0,2000),
+          Number(p.price)||0,
+          parseInt(p.stock,10)||0,
+          String(p.image_url||'').slice(0,500),
+          p.featured ? 1 : 0
+        ]
+      );
+      inserted++;
+    } catch (e) {
+      errors++;
+      console.error('[import] erro:', e.message, '| produto:', p.name);
+    }
+  }
+  res.json({ ok: true, total: items.length, inserted, skipped, errors });
+});
+
 app.use((req, res) => res.status(404).render('404'));
 
 (async () => {
