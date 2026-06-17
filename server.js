@@ -474,6 +474,12 @@ app.post('/admin/importar', adminAuth, express.json({ limit: '4mb' }), async (re
   res.json({ ok: true, total: items.length, inserted, skipped, errors });
 });
 
+// Remove produtos seed (identificados pela URL de imagem do Unsplash)
+app.post('/admin/limpar-seed', adminAuth, async (req, res) => {
+  const [r] = await pool.execute("DELETE FROM products WHERE image_url LIKE '%unsplash%'");
+  res.json({ ok: true, removed: r.affectedRows || 0 });
+});
+
 app.use((req, res) => res.status(404).render('404'));
 
 (async () => {
