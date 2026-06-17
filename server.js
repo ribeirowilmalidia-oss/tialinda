@@ -74,7 +74,7 @@ async function migrate() {
   )`);
 
   const [rows] = await pool.execute('SELECT COUNT(*) AS c FROM products');
-  if (rows[0].c === 0) await seed();
+  if (Number(rows[0].c) === 0) await seed();
 }
 
 async function seed() {
@@ -444,7 +444,13 @@ app.post('/admin/pedido/:id/status', adminAuth, async (req, res) => {
 app.use((req, res) => res.status(404).render('404'));
 
 (async () => {
-  await migrate();
   const port = parseInt(process.env.PORT || '3000', 10);
+  try {
+    console.log('[startup] running migrate()...');
+    await migrate();
+    console.log('[startup] migrate ok');
+  } catch (e) {
+    console.error('[startup] migrate FAILED:', e && e.stack || e);
+  }
   app.listen(port, '0.0.0.0', () => console.log('Tia Linda rodando em :' + port));
 })();
