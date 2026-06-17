@@ -1,0 +1,31 @@
+<% const title='Pedidos'; %><%- include('_head') %>
+
+<header class="admin-header">
+  <h1>Pedidos &amp; Entrega</h1>
+  <p class="muted"><%= orders.length %> pedido(s)</p>
+</header>
+
+<div class="card">
+  <table class="t t-stretch">
+    <thead><tr><th>#</th><th>Cliente</th><th>Cidade/UF</th><th>Total</th><th>Pagamento</th><th>Status</th><th>Data</th><th></th></tr></thead>
+    <tbody>
+      <% if (!orders.length) { %>
+        <tr><td colspan="8" class="muted" style="text-align:center;padding:24px">Nenhum pedido recebido ainda.</td></tr>
+      <% } %>
+      <% orders.forEach(o => { %>
+        <tr>
+          <td><strong>#<%= o.id %></strong></td>
+          <td><%= o.customer_name %><br><small class="muted"><%= o.email %></small></td>
+          <td><%= o.city %>/<%= o.state %></td>
+          <td><%= brl(o.total) %></td>
+          <td><%= o.payment %></td>
+          <td><span class="status status-<%= o.status %>"><%= o.status %></span></td>
+          <td><small><%= new Date(o.created_at).toLocaleDateString('pt-BR') %></small></td>
+          <td><a class="btn btn-soft btn-sm" href="/admin/pedido/<%= o.id %>">Detalhes</a></td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<%- include('_foot') %>

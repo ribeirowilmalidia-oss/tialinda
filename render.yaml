@@ -1,0 +1,26 @@
+# Render Blueprint - https://render.com/docs/blueprint-spec
+# Faz deploy automático ao push em main.
+services:
+  - type: web
+    name: tialinda
+    runtime: node
+    plan: free                # mude para "starter" depois para evitar cold start
+    region: oregon            # mude para "frankfurt" se preferir latência menor
+    branch: main
+    autoDeploy: true
+    buildCommand: npm install
+    startCommand: node server.js
+    healthCheckPath: /
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false           # você cola o valor manualmente no painel
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: PIX_KEY
+        value: ee9e688b-ee8f-4c7d-86e9-7abc7d971cc6
+      - key: PIX_NAME
+        value: Wilma Lidia Ribeiro
+      - key: PIX_CITY
+        value: Santos

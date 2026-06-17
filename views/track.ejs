@@ -1,0 +1,110 @@
+<% const title='Rastrear Pedido'; %><%- include('partials/header') %>
+
+<section class="wrap section">
+  <nav class="crumbs"><a href="/">Início</a> · <span>Rastrear</span></nav>
+  <h1>Rastrear pedido</h1>
+  <p class="muted">Use o <strong>código de rastreio</strong> (TL...), o <strong>número do pedido</strong> (#123) ou o <strong>e-mail</strong> da compra.</p>
+
+  <form method="get" action="/rastrear" class="track-form">
+    <input name="code" placeholder="Ex.: TLMQIBPXM7744, #7 ou seu@email.com" value="<%= code %>" required autofocus>
+    <button class="btn btn-primary">Rastrear</button>
+  </form>
+
+  <% if (code && !order) { %>
+    <div class="empty-state track-empty">
+      <h3>Não encontramos esse pedido</h3>
+      <p class="muted">Confira se digitou o código corretamente. O código de rastreio tem o formato <code>TL</code> seguido de letras e números.</p>
+      <p class="muted small">Em caso de dúvida, fale conosco no WhatsApp <a href="https://wa.me/5513996554822?text=Ol%C3%A1!%20N%C3%A3o%20consigo%20rastrear%20meu%20pedido%20<%= encodeURIComponent(code) %>." target="_blank" rel="noopener">(13) 99655-4822</a>.</p>
+    </div>
+  <% } %>
+
+  <% if (!code) { %>
+    <div class="track-help">
+      <div class="help-card">
+        <strong>Onde encontro o código?</strong>
+        <p class="muted">Enviamos por e-mail logo após a confirmação do pedido. Também aparece na tela de "Pedido confirmado" e na sua conta.</p>
+      </div>
+      <div class="help-card">
+        <strong>Prazo de entrega</strong>
+        <p class="muted">Capital de SP: 1 a 3 dias úteis. Demais regiões: 4 a 8 dias úteis. Frete grátis acima de R$ 199.</p>
+      </div>
+      <div class="help-card">
+        <strong>Status possíveis</strong>
+        <p class="muted">Pedido recebido · Pagamento confirmado · Em separação · Enviado · Em trânsito · Saiu para entrega · Entregue.</p>
+      </div>
+    </div>
+  <% } %>
+
+  <% if (order) { %>
+    <div class="order-box">
+      <div class="order-head">
+        <div><small>Pedido</small><strong>#<%= order.id %></strong></div>
+        <div><small>Rastreio</small><strong><%= order.tracking_code %></strong></div>
+        <div><small>Status</small><span class="status status-<%= order.status %>"><%= order.status %></span></div>
+        <div><small>Total</small><strong><%= brl(order.total) %></strong></div>
+      </div>
+
+      <% if (estDelivery && order.status !== 'entregue') {
+           const d = estDelivery;
+           const dd = String(d.getDate()).padStart(2,'0');
+           const mm = String(d.getMonth()+1).padStart(2,'0');
+           const yy = d.getFullYear();
+      %>
+        <div class="est-delivery">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7h13l5 4v6h-4M3 7v10h12V7H3zM7 17a2 2 0 1 0 4 0 2 2 0 0 0-4 0zm10 0a2 2 0 1 0 4 0 2 2 0 0 0-4 0z"/></svg>
+          <div>
+            <small>Previsão de entrega</small>
+            <strong><%= dd %>/<%= mm %>/<%= yy %></strong>
+          </div>
+        </div>
+      <% } %>
+
+      <div class="track-steps">
+        <% const ss=['pendente','pago','enviado','entregue']; const ii=ss.indexOf(order.status); %>
+        <% ss.forEach((s,idx) => { %>
+          <div class="step <%= idx<=ii ? 'done' : '' %>"><span><%= idx+1 %></span><%= s %></div>
+        <% }) %>
+      </div>
+
+      <h3>Histórico de movimentação</h3>
+      <ol class="event-timeline">
+        <% events.forEach(ev => {
+           const d = ev.date;
+           const ds = String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0') + '/' + d.getFullYear();
+           const hs = String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+        %>
+          <li class="event <%= ev.done ? 'done' : 'pending' %> <%= ev.active ? 'active' : '' %>">
+            <div class="ev-dot"></div>
+            <div class="ev-body">
+              <div class="ev-head">
+                <strong><%= ev.label %></strong>
+                <% if (ev.done) { %><time><%= ds %> · <%= hs %></time><% } else { %><time class="muted">previsto</time><% } %>
+              </div>
+              <p class="muted small"><%= ev.desc %></p>
+            </div>
+          </li>
+        <% }) %>
+      </ol>
+
+      <h3>Itens</h3>
+      <% items.forEach(it => { %>
+        <div class="ck-row">
+          <div class="ck-info"><span><%= it.name %></span><small>Qtd: <%= it.qty %></small></div>
+          <strong><%= brl(it.price * it.qty) %></strong>
+        </div>
+      <% }) %>
+
+      <h3>Endereço de entrega</h3>
+      <p><%= order.customer_name %><br>
+         <%= order.address %><br>
+         <%= order.city %>/<%= order.state %> · CEP <%= order.cep %></p>
+
+      <div class="track-actions">
+        <a href="/pedido/<%= order.id %>?t=<%= order.tracking_code %>" class="btn btn-soft">Ver detalhes do pedido</a>
+        <a href="https://wa.me/5513996554822?text=Ol%C3%A1!%20Estou%20acompanhando%20o%20pedido%20%23<%= order.id %>%20(<%= order.tracking_code %>)%20e%20tenho%20uma%20d%C3%BAvida." target="_blank" rel="noopener" class="btn btn-primary">Falar no WhatsApp sobre este pedido</a>
+      </div>
+    </div>
+  <% } %>
+</section>
+
+<%- include('partials/footer') %>

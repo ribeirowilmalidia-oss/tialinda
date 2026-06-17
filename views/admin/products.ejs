@@ -1,0 +1,34 @@
+<% const title='Produtos'; %><%- include('_head') %>
+
+<header class="admin-header">
+  <div>
+    <h1>Produtos &amp; Estoque</h1>
+    <p class="muted"><%= products.length %> produto(s) cadastrado(s)</p>
+  </div>
+  <a href="/admin/produto/novo" class="btn btn-primary">+ Novo produto</a>
+</header>
+
+<div class="card">
+  <table class="t t-stretch">
+    <thead><tr><th></th><th>Produto</th><th>Categoria</th><th>Preço</th><th>Estoque</th><th></th></tr></thead>
+    <tbody>
+      <% products.forEach(p => { %>
+        <tr>
+          <td><div class="thumb" style="background-image:url('<%= p.image_url %>')"></div></td>
+          <td><strong><%= p.name %></strong><br><small class="muted"><%= p.slug %></small></td>
+          <td><%= (CATEGORIES.find(c=>c.slug===p.category)||{}).name %></td>
+          <td><%= brl(p.price) %></td>
+          <td><strong class="<%= p.stock < 5 ? 'danger' : p.stock < 10 ? 'warn' : '' %>"><%= p.stock %></strong></td>
+          <td class="actions">
+            <a href="/admin/produto/<%= p.id %>" class="btn btn-soft btn-sm">Editar</a>
+            <form action="/admin/produto/<%= p.id %>/excluir" method="post" onsubmit="return confirm('Excluir este produto?')">
+              <button class="btn btn-danger btn-sm">Excluir</button>
+            </form>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<%- include('_foot') %>

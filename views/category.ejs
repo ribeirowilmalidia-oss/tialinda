@@ -1,0 +1,23 @@
+<% const title = cat.name; %><%- include('partials/header') %>
+
+<section class="page-head">
+  <div class="wrap">
+    <nav class="crumbs"><a href="/">Início</a> · <span><%= cat.name %></span></nav>
+    <h1><%= cat.name %></h1>
+    <p class="muted"><%= products.length %> produto(s) na categoria</p>
+  </div>
+</section>
+
+<section class="wrap section">
+  <% if (products.length === 0) { %>
+    <p class="empty">Nenhum produto cadastrado nesta categoria ainda.</p>
+  <% } else { %>
+    <div class="prod-grid">
+      <% products.forEach(p => { %>
+        <%- include('partials/card', { p }) %>
+      <% }) %>
+    </div>
+  <% } %>
+</section>
+
+<%- include('partials/footer') %>

@@ -1,0 +1,21 @@
+{
+  "name": "tialinda-ecommerce",
+  "version": "1.0.0",
+  "private": true,
+  "main": "server.js",
+  "engines": {
+    "node": "22.x"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "ejs": "^3.1.10",
+    "mysql2": "^3.10.1",
+    "better-sqlite3": "^11.3.0",
+    "cookie-parser": "^1.4.6",
+    "body-parser": "^1.20.2"
+  }
+}

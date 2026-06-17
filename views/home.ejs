@@ -1,0 +1,77 @@
+<% const title='Início'; %><%- include('partials/header') %>
+
+<section class="hero">
+  <div class="wrap hero-grid">
+    <div class="hero-text">
+      <span class="eyebrow">Enxoval · Moda · Decoração · Bem-estar</span>
+      <h1>O aconchego da sua casa começa aqui.</h1>
+      <p>Enxoval, perfumaria e cosméticos selecionados a dedo pela <strong>Tia Linda</strong> — qualidade de verdade, atendimento próximo e entrega para todo o Brasil.</p>
+      <div class="hero-cta">
+        <a href="/categoria/cama" class="btn btn-primary">Ver coleção Cama</a>
+        <a href="/categoria/perfumaria" class="btn btn-gold">Perfumaria</a>
+      </div>
+      <div class="hero-badges">
+        <div><strong>Frete grátis</strong><span>acima de R$ 199</span></div>
+        <div><strong>6x sem juros</strong><span>no cartão</span></div>
+        <div><strong>Troca fácil</strong><span>até 30 dias</span></div>
+      </div>
+    </div>
+    <div class="hero-card">
+      <div class="hero-img" style="background-image:url('https://images.unsplash.com/photo-1616594039964-ae9021a400a0?w=900')"></div>
+      <div class="hero-tag">Novidade · Enxoval Premium</div>
+    </div>
+  </div>
+</section>
+
+<section class="wrap cats-strip">
+  <% CATEGORIES.forEach(c => { %>
+    <a href="/categoria/<%= c.slug %>" class="cat-pill">
+      <span class="cat-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="<%= c.icon %>"/></svg></span>
+      <span><%= c.name %></span>
+    </a>
+  <% }) %>
+</section>
+
+<section class="wrap section">
+  <div class="section-head">
+    <h2>Selecionados pela Tia</h2>
+    <a href="/categoria/cama" class="see-all">Ver tudo →</a>
+  </div>
+  <div class="prod-grid">
+    <% featured.forEach(p => { %>
+      <%- include('partials/card', { p }) %>
+    <% }) %>
+  </div>
+</section>
+
+<section class="banner-strip wrap">
+  <div class="banner banner-rose">
+    <div>
+      <span class="eyebrow">Cama & Banho</span>
+      <h3>Aconchego que abraça.</h3>
+      <p>Edredons, jogos de cama e roupões em microfibra premium.</p>
+      <a href="/categoria/cama" class="btn btn-primary">Explorar</a>
+    </div>
+  </div>
+  <div class="banner banner-gold">
+    <div>
+      <span class="eyebrow">Perfumaria &amp; Cosméticos</span>
+      <h3>Fragrâncias que marcam.</h3>
+      <p>Perfumes femininos e cosméticos para realçar o seu bem-estar.</p>
+      <a href="/categoria/perfumaria" class="btn btn-primary">Descobrir</a>
+    </div>
+  </div>
+</section>
+
+<section class="wrap section">
+  <div class="section-head">
+    <h2>Chegou agora</h2>
+  </div>
+  <div class="prod-grid">
+    <% latest.forEach(p => { %>
+      <%- include('partials/card', { p }) %>
+    <% }) %>
+  </div>
+</section>
+
+<%- include('partials/footer') %>

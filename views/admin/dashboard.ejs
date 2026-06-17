@@ -1,0 +1,44 @@
+<% const title='Dashboard'; %><%- include('_head') %>
+
+<header class="admin-header">
+  <h1>Bom dia, Tia Linda <span class="wave">✿</span></h1>
+  <p class="muted">Visão geral da operação</p>
+</header>
+
+<div class="kpi-grid">
+  <div class="kpi"><small>Produtos cadastrados</small><strong><%= stats.prods %></strong></div>
+  <div class="kpi"><small>Itens em estoque</small><strong><%= stats.stock || 0 %></strong></div>
+  <div class="kpi"><small>Pedidos no total</small><strong><%= ord.total %></strong></div>
+  <div class="kpi kpi-accent"><small>Receita acumulada</small><strong><%= brl(ord.revenue || 0) %></strong></div>
+  <div class="kpi"><small>Pedidos pendentes</small><strong><%= pend.c %></strong></div>
+</div>
+
+<div class="admin-grid">
+  <section class="card">
+    <div class="card-head"><h2>Estoque baixo</h2><a href="/admin/produtos">Ver tudo</a></div>
+    <% if (!low.length) { %><p class="muted">Nenhum produto com estoque crítico. ✿</p><% } %>
+    <% low.forEach(p => { %>
+      <div class="lo-row">
+        <span><a href="/admin/produto/<%= p.id %>"><%= p.name %></a></span>
+        <strong class="<%= p.stock < 3 ? 'danger' : 'warn' %>"><%= p.stock %> un.</strong>
+      </div>
+    <% }) %>
+  </section>
+
+  <section class="card">
+    <div class="card-head"><h2>Pedidos recentes</h2><a href="/admin/pedidos">Ver tudo</a></div>
+    <% if (!recent.length) { %><p class="muted">Nenhum pedido ainda.</p><% } %>
+    <table class="t">
+      <% recent.forEach(o => { %>
+        <tr>
+          <td><a href="/admin/pedido/<%= o.id %>">#<%= o.id %></a></td>
+          <td><%= o.customer_name %></td>
+          <td><%= brl(o.total) %></td>
+          <td><span class="status status-<%= o.status %>"><%= o.status %></span></td>
+        </tr>
+      <% }) %>
+    </table>
+  </section>
+</div>
+
+<%- include('_foot') %>

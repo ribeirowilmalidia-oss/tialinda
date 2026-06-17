@@ -1,0 +1,52 @@
+<% const title = p.name; %><%- include('partials/header') %>
+
+<section class="wrap section">
+  <nav class="crumbs"><a href="/">Início</a> · <a href="/categoria/<%= p.category %>"><%= (CATEGORIES.find(c=>c.slug===p.category)||{}).name %></a> · <span><%= p.name %></span></nav>
+  <div class="product-detail">
+    <div class="pd-img" style="background-image:url('<%= p.image_url %>')"></div>
+    <div class="pd-info">
+      <span class="prod-cat"><%= (CATEGORIES.find(c=>c.slug===p.category)||{}).name %></span>
+      <h1><%= p.name %></h1>
+      <div class="pd-price">
+        <strong><%= brl(p.price) %></strong>
+        <span class="muted">ou 6x de <%= brl(p.price/6) %> sem juros</span>
+      </div>
+      <p class="pd-desc"><%= p.description %></p>
+      <div class="pd-stock">
+        <% if (p.stock > 5) { %>
+          <span class="dot dot-ok"></span> Em estoque · pronta entrega
+        <% } else if (p.stock > 0) { %>
+          <span class="dot dot-warn"></span> Últimas <%= p.stock %> peças
+        <% } else { %>
+          <span class="dot dot-off"></span> Produto esgotado
+        <% } %>
+      </div>
+      <% if (p.stock > 0) { %>
+        <form action="/carrinho/adicionar" method="post" class="pd-form">
+          <input type="hidden" name="id" value="<%= p.id %>">
+          <label>Quantidade
+            <input type="number" name="qty" value="1" min="1" max="<%= p.stock %>">
+          </label>
+          <button class="btn btn-primary btn-lg">Adicionar ao carrinho</button>
+        </form>
+      <% } %>
+      <ul class="pd-perks">
+        <li>✓ Frete grátis acima de R$ 199</li>
+        <li>✓ Entrega para todo o Brasil</li>
+        <li>✓ Troca em até 30 dias</li>
+        <li>✓ Pagamento seguro (Pix, cartão, boleto)</li>
+      </ul>
+    </div>
+  </div>
+
+  <% if (related.length) { %>
+    <div class="section-head"><h2>Você também pode gostar</h2></div>
+    <div class="prod-grid">
+      <% related.forEach(p => { %>
+        <%- include('partials/card', { p }) %>
+      <% }) %>
+    </div>
+  <% } %>
+</section>
+
+<%- include('partials/footer') %>

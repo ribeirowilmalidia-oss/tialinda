@@ -1,0 +1,219 @@
+<% const title='Finalizar Compra'; %><%- include('partials/header') %>
+
+<section class="wrap section">
+  <nav class="crumbs"><a href="/">Início</a> · <a href="/carrinho">Carrinho</a> · <span>Checkout</span></nav>
+  <h1>Finalizar compra</h1>
+
+  <form action="/checkout/finalizar" method="post" class="checkout-grid" id="checkoutForm">
+    <div class="checkout-fields">
+      <fieldset>
+        <legend>Dados do comprador</legend>
+        <label>Nome completo <input name="name" required></label>
+        <div class="row-2">
+          <label>E-mail <input name="email" type="email" required></label>
+          <label>Telefone <input name="phone" placeholder="(11) 99999-0000"></label>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Endereço de entrega</legend>
+        <div class="row-2">
+          <label>CEP <input name="cep" id="cep" placeholder="00000-000" inputmode="numeric" maxlength="9" autocomplete="postal-code" required></label>
+          <label>Cidade <input name="city" id="city" required></label>
+        </div>
+        <div class="row-2">
+          <label>Endereço <input name="address" id="address" placeholder="Rua, número, bairro" required></label>
+          <label>UF <input name="state" id="state" maxlength="2" placeholder="SP" required></label>
+        </div>
+        <button type="button" id="btnFrete" class="btn btn-soft">Calcular frete</button>
+        <p id="freteResult" class="muted" aria-live="polite"></p>
+      </fieldset>
+      <fieldset>
+        <legend>Pagamento</legend>
+        <div class="pay-options">
+          <label><input type="radio" name="payment" value="pix" checked> Pix (5% off na confirmação)</label>
+          <label><input type="radio" name="payment" value="cartao"> Cartão de crédito (até 6x)</label>
+          <label><input type="radio" name="payment" value="boleto"> Boleto bancário</label>
+        </div>
+
+        <div id="cardFields" class="card-fields" hidden>
+          <div class="row-2">
+            <label>Número do cartão
+              <input name="card_number" id="card_number" inputmode="numeric" maxlength="23" autocomplete="cc-number" placeholder="0000 0000 0000 0000">
+              <small class="muted" id="cardBrand"></small>
+            </label>
+            <label>Nome impresso
+              <input name="card_holder" id="card_holder" autocomplete="cc-name" placeholder="Como está no cartão">
+            </label>
+          </div>
+          <div class="row-3">
+            <label>Validade
+              <input name="card_expiry" id="card_expiry" inputmode="numeric" maxlength="5" autocomplete="cc-exp" placeholder="MM/AA">
+            </label>
+            <label>CVV
+              <input name="card_cvv" id="card_cvv" inputmode="numeric" maxlength="4" autocomplete="cc-csc" placeholder="000">
+            </label>
+            <label>Parcelas
+              <select name="installments" id="installments">
+                <option value="1">1x à vista</option>
+                <option value="2">2x sem juros</option>
+                <option value="3">3x sem juros</option>
+                <option value="4">4x sem juros</option>
+                <option value="5">5x sem juros</option>
+                <option value="6">6x sem juros</option>
+              </select>
+            </label>
+          </div>
+        </div>
+      </fieldset>
+    </div>
+
+    <aside class="checkout-summary">
+      <h3>Resumo do pedido</h3>
+      <% items.forEach(it => { %>
+        <div class="ck-row">
+          <div class="ck-img" style="background-image:url('<%= it.image_url %>')"></div>
+          <div class="ck-info"><span><%= it.name %></span><small>Qtd: <%= it.qty %></small></div>
+          <strong><%= brl(it.line) %></strong>
+        </div>
+      <% }) %>
+      <hr>
+      <div class="row"><span>Subtotal</span><strong id="sumSub" data-v="<%= subtotal %>"><%= brl(subtotal) %></strong></div>
+      <div class="row"><span>Frete</span><strong id="sumShip">—</strong></div>
+      <div class="row total"><span>Total</span><strong id="sumTotal"><%= brl(subtotal) %></strong></div>
+      <button class="btn btn-primary btn-block btn-lg">Confirmar pedido</button>
+      <p class="muted small">Ao confirmar, você concorda com os termos da Tia Linda.</p>
+    </aside>
+  </form>
+</section>
+
+<script>
+const sub = <%= subtotal %>;
+function brl(n){return 'R$ '+n.toFixed(2).replace('.',',')}
+function digits(s){return (s||'').replace(/\D/g,'')}
+
+const cepInput   = document.getElementById('cep');
+const addrInput  = document.getElementById('address');
+const cityInput  = document.getElementById('city');
+const stateInput = document.getElementById('state');
+const sumShip    = document.getElementById('sumShip');
+const sumTotal   = document.getElementById('sumTotal');
+const freteMsg   = document.getElementById('freteResult');
+
+// CEP mask 00000-000
+cepInput.addEventListener('input', () => {
+  const d = digits(cepInput.value).slice(0,8);
+  cepInput.value = d.length > 5 ? d.slice(0,5) + '-' + d.slice(5) : d;
+  if (d.length === 8) lookupAndCalc(d);
+});
+
+async function lookupAndCalc(cep){
+  freteMsg.textContent = 'Buscando endereço…';
+  try {
+    const r = await fetch('https://viacep.com.br/ws/' + cep + '/json/');
+    const v = await r.json();
+    if (v.erro) { freteMsg.textContent = 'CEP não encontrado.'; return; }
+    // Autofill (mantém o que o usuário digitou se já houver)
+    if (!addrInput.value.trim() && v.logradouro) {
+      addrInput.value = v.logradouro + (v.bairro ? ' - ' + v.bairro : '');
+    }
+    if (!cityInput.value.trim() && v.localidade) cityInput.value = v.localidade;
+    if (!stateInput.value.trim() && v.uf) stateInput.value = v.uf;
+  } catch(e) {
+    freteMsg.textContent = 'Não foi possível buscar o endereço, mas o frete será calculado.';
+  }
+  await calcFrete(cep);
+}
+
+async function calcFrete(cep){
+  try {
+    const r = await fetch('/checkout/frete', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({cep})});
+    const d = await r.json();
+    sumShip.textContent  = d.free ? 'Grátis' : brl(d.shipping);
+    sumTotal.textContent = brl(d.total);
+    freteMsg.textContent = d.free ? 'Você ganhou frete grátis!' : 'Frete para ' + cep.slice(0,5) + '-' + cep.slice(5) + ': ' + brl(d.shipping);
+  } catch(e) {
+    freteMsg.textContent = 'Falha ao calcular o frete. Tente novamente.';
+  }
+}
+
+document.getElementById('btnFrete').addEventListener('click', () => {
+  const d = digits(cepInput.value);
+  if (d.length !== 8) return alert('Informe um CEP válido (8 dígitos).');
+  lookupAndCalc(d);
+});
+
+// UF sempre maiúsculo
+stateInput.addEventListener('input', () => { stateInput.value = stateInput.value.toUpperCase().replace(/[^A-Z]/g,''); });
+
+// ===== Pagamento: campos de cartão =====
+const cardFields = document.getElementById('cardFields');
+const cardNum    = document.getElementById('card_number');
+const cardExp    = document.getElementById('card_expiry');
+const cardCvv    = document.getElementById('card_cvv');
+const cardBrand  = document.getElementById('cardBrand');
+const instSel    = document.getElementById('installments');
+const payRadios  = document.querySelectorAll('input[name="payment"]');
+
+function togglePayment() {
+  const v = document.querySelector('input[name="payment"]:checked').value;
+  const isCard = v === 'cartao';
+  cardFields.hidden = !isCard;
+  // required dinâmico
+  ['card_number','card_holder','card_expiry','card_cvv'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.required = isCard;
+  });
+}
+payRadios.forEach(r => r.addEventListener('change', togglePayment));
+togglePayment();
+
+// Máscara do número (xxxx xxxx xxxx xxxx) + bandeira
+function brand(num){
+  const s = (num||'').replace(/\D/g,'');
+  if (/^4/.test(s)) return 'Visa';
+  if (/^(5[1-5]|2[2-7])/.test(s)) return 'Mastercard';
+  if (/^3[47]/.test(s)) return 'Amex';
+  if (/^(4011|4312|4389|4514|4573|5041|5066|5067|509|627780|636297|6504|6505|6516|6550)/.test(s)) return 'Elo';
+  if (/^(606282|3841)/.test(s)) return 'Hipercard';
+  if (/^6(?:011|5)/.test(s)) return 'Discover';
+  return '';
+}
+cardNum.addEventListener('input', () => {
+  let d = cardNum.value.replace(/\D/g,'').slice(0,19);
+  cardNum.value = d.replace(/(.{4})/g,'$1 ').trim();
+  const b = brand(d);
+  cardBrand.textContent = b ? ('Bandeira: ' + b) : '';
+});
+
+// Validade MM/AA
+cardExp.addEventListener('input', () => {
+  let d = cardExp.value.replace(/\D/g,'').slice(0,4);
+  cardExp.value = d.length > 2 ? d.slice(0,2) + '/' + d.slice(2) : d;
+});
+
+// CVV só números
+cardCvv.addEventListener('input', () => { cardCvv.value = cardCvv.value.replace(/\D/g,'').slice(0,4); });
+
+// Luhn no submit
+function luhn(num){
+  const s = (num||'').replace(/\D/g,'');
+  if (s.length < 13) return false;
+  let sum=0, alt=false;
+  for (let i=s.length-1;i>=0;i--){
+    let n = parseInt(s[i],10);
+    if (alt){ n*=2; if (n>9) n-=9; }
+    sum+=n; alt=!alt;
+  }
+  return sum % 10 === 0;
+}
+document.getElementById('checkoutForm').addEventListener('submit', (e) => {
+  const pay = document.querySelector('input[name="payment"]:checked').value;
+  if (pay === 'cartao' && !luhn(cardNum.value)) {
+    e.preventDefault();
+    alert('Número do cartão inválido. Verifique os dígitos.');
+    cardNum.focus();
+  }
+});
+</script>
+
+<%- include('partials/footer') %>

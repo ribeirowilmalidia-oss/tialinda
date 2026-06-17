@@ -1,0 +1,101 @@
+<% const title='Carrinho'; %><%- include('partials/header') %>
+
+<section class="wrap section">
+  <nav class="crumbs"><a href="/">Início</a> · <span>Carrinho</span></nav>
+  <h1>Seu carrinho</h1>
+
+  <% if (!items.length) { %>
+    <div class="empty-state">
+      <h2>Seu carrinho está vazio</h2>
+      <p class="muted">Que tal dar uma olhada nas nossas categorias?</p>
+      <a href="/" class="btn btn-primary">Voltar à loja</a>
+    </div>
+  <% } else { %>
+    <div class="cart-grid">
+      <div class="cart-list">
+        <% items.forEach(it => { %>
+          <div class="cart-row">
+            <div class="cart-img" style="background-image:url('<%= it.image_url %>')"></div>
+            <div class="cart-info">
+              <a href="/produto/<%= it.id %>"><%= it.name %></a>
+              <small><%= (CATEGORIES.find(c=>c.slug===it.category)||{}).name %></small>
+              <strong><%= brl(it.price) %></strong>
+            </div>
+            <form action="/carrinho/atualizar" method="post" class="cart-qty">
+              <input type="hidden" name="id" value="<%= it.id %>">
+              <input type="number" name="qty" value="<%= it.qty %>" min="0" max="<%= it.stock %>">
+              <button class="btn btn-soft btn-sm">Atualizar</button>
+            </form>
+            <div class="cart-line"><%= brl(it.line) %></div>
+            <form action="/carrinho/atualizar" method="post" class="cart-remove">
+              <input type="hidden" name="id" value="<%= it.id %>">
+              <input type="hidden" name="qty" value="0">
+              <button title="Remover" class="link-btn">×</button>
+            </form>
+          </div>
+        <% }) %>
+      </div>
+      <aside class="cart-summary">
+        <h3>Resumo</h3>
+        <div class="row"><span>Subtotal</span><strong id="cartSub" data-v="<%= subtotal %>"><%= brl(subtotal) %></strong></div>
+        <div class="row"><span>Frete</span><strong id="cartShip">—</strong></div>
+        <div class="row total"><span>Total</span><strong id="cartTotal"><%= brl(subtotal) %></strong></div>
+
+        <div class="cep-sim">
+          <label for="cepSim">Calcular frete</label>
+          <div class="cep-row">
+            <input id="cepSim" inputmode="numeric" maxlength="9" placeholder="00000-000" autocomplete="postal-code">
+            <button type="button" id="cepBtn" class="btn btn-soft btn-sm">OK</button>
+          </div>
+          <p id="cepInfo" class="muted small" aria-live="polite">Informe o CEP para ver o valor do frete.</p>
+        </div>
+
+        <a href="/checkout" class="btn btn-primary btn-block btn-lg">Finalizar compra</a>
+        <a href="/" class="btn btn-ghost btn-block">Continuar comprando</a>
+      </aside>
+    </div>
+  <% } %>
+</section>
+
+<script>
+(function(){
+  const sub = Number(<%= subtotal %>);
+  if (!sub) return;
+  function brl(n){return 'R$ '+n.toFixed(2).replace('.',',')}
+  function digits(s){return (s||'').replace(/\D/g,'')}
+  const inp  = document.getElementById('cepSim');
+  const btn  = document.getElementById('cepBtn');
+  const ship = document.getElementById('cartShip');
+  const tot  = document.getElementById('cartTotal');
+  const info = document.getElementById('cepInfo');
+  if (!inp) return;
+  inp.addEventListener('input', () => {
+    const d = digits(inp.value).slice(0,8);
+    inp.value = d.length > 5 ? d.slice(0,5) + '-' + d.slice(5) : d;
+    if (d.length === 8) run(d);
+  });
+  btn.addEventListener('click', () => {
+    const d = digits(inp.value);
+    if (d.length !== 8) { info.textContent = 'Informe um CEP válido (8 dígitos).'; return; }
+    run(d);
+  });
+  async function run(cep){
+    info.textContent = 'Calculando…';
+    let cityName = '';
+    try {
+      const v = await (await fetch('https://viacep.com.br/ws/'+cep+'/json/')).json();
+      if (!v.erro) cityName = (v.localidade || '') + (v.uf ? '/' + v.uf : '');
+    } catch(e) {}
+    try {
+      const d = await (await fetch('/checkout/frete', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({cep})})).json();
+      ship.textContent = d.free ? 'Grátis' : brl(d.shipping);
+      tot.textContent  = brl(d.total);
+      info.textContent = (cityName ? cityName + ' · ' : '') + (d.free ? 'Frete grátis!' : 'Entrega: ' + brl(d.shipping));
+    } catch(e) {
+      info.textContent = 'Não foi possível calcular o frete.';
+    }
+  }
+})();
+</script>
+
+<%- include('partials/footer') %>

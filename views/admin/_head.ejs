@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title><%= typeof title!=='undefined' ? title+' · ' : '' %>Admin Tia Linda</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Cormorant+Garamond:wght@600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body class="admin-body">
+<div class="admin-shell">
+  <aside class="admin-side">
+    <a href="/admin" class="logo"><img src="/img/logo-emblem.png" alt="Tia Linda" style="width:100%;border-radius:10px"></a>
+    <nav>
+      <a href="/admin">Dashboard</a>
+      <a href="/admin/produtos">Produtos &amp; Estoque</a>
+      <a href="/admin/pedidos">Pedidos &amp; Entrega</a>
+      <a href="/" target="_blank">Ver loja ↗</a>
+      <a href="/admin/logout" class="logout">Sair</a>
+    </nav>
+  </aside>
+  <main class="admin-main">

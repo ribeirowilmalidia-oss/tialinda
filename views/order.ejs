@@ -1,0 +1,163 @@
+<% const title='Pedido #'+o.id; %><%- include('partials/header') %>
+
+<section class="wrap section">
+  <div class="order-confirm">
+    <div class="check-mark">✓</div>
+    <h1>Pedido confirmado!</h1>
+    <p class="muted">Obrigada, <strong><%= o.customer_name %></strong>. Já recebemos seu pedido e em breve enviaremos para você.</p>
+  </div>
+
+  <div class="order-box">
+    <div class="order-head">
+      <div>
+        <small>Pedido</small>
+        <strong>#<%= o.id %></strong>
+      </div>
+      <div>
+        <small>Código de rastreio</small>
+        <strong><%= o.tracking_code %></strong>
+      </div>
+      <div>
+        <small>Status</small>
+        <span class="status status-<%= o.status %>"><%= o.status %></span>
+      </div>
+    </div>
+
+    <h3>Itens</h3>
+    <% items.forEach(it => { %>
+      <div class="ck-row">
+        <div class="ck-info"><span><%= it.name %></span><small>Qtd: <%= it.qty %> · <%= brl(it.price) %></small></div>
+        <strong><%= brl(it.price * it.qty) %></strong>
+      </div>
+    <% }) %>
+
+    <hr>
+    <div class="row"><span>Subtotal</span><strong><%= brl(o.subtotal) %></strong></div>
+    <div class="row"><span>Frete</span><strong><%= Number(o.shipping)===0 ? 'Grátis' : brl(o.shipping) %></strong></div>
+    <div class="row total"><span>Total</span><strong><%= brl(o.total) %></strong></div>
+
+    <h3>Entrega</h3>
+    <p><%= o.address %><br><%= o.city %>/<%= o.state %> · CEP <%= o.cep %></p>
+
+    <h3>Pagamento</h3>
+    <p><%= o.payment === 'pix' ? 'Pix' : o.payment === 'cartao' ? 'Cartão de crédito' : 'Boleto bancário' %></p>
+
+    <% if (o.payment === 'pix' && pay.pix) { %>
+      <div class="pay-panel pay-pix">
+        <div class="pix-grid">
+          <div class="pix-qr">
+            <img src="<%= pay.pix.qrUrl %>" alt="QR Code do PIX" width="240" height="240">
+          </div>
+          <div class="pix-info">
+            <strong>Pague com PIX e seu pedido é liberado na hora.</strong>
+            <ol class="pix-steps">
+              <li>Abra o app do seu banco e escolha <em>Pagar com PIX → Copia e Cola</em> (ou QR Code).</li>
+              <li>Cole o código abaixo ou aponte a câmera para o QR.</li>
+              <li>Confira o valor: <strong><%= brl(o.total) %></strong>.</li>
+            </ol>
+            <div class="pix-code">
+              <textarea id="pixCode" readonly rows="3"><%= pay.pix.code %></textarea>
+              <button type="button" class="btn btn-primary btn-sm" id="copyPix">Copiar código</button>
+            </div>
+            <p class="muted small">Identificador: <code><%= o.tracking_code %></code></p>
+          </div>
+        </div>
+      </div>
+      <script>
+        document.getElementById('copyPix').addEventListener('click', async () => {
+          const ta = document.getElementById('pixCode');
+          try { await navigator.clipboard.writeText(ta.value); }
+          catch { ta.select(); document.execCommand('copy'); }
+          const b = document.getElementById('copyPix');
+          const old = b.textContent; b.textContent = 'Copiado!';
+          setTimeout(() => b.textContent = old, 1800);
+        });
+      </script>
+    <% } else if (o.payment === 'boleto' && pay.boleto) { %>
+      <%
+        const bc = pay.boleto;
+        const due = bc.dueDate;
+        const dueStr = String(due.getUTCDate()).padStart(2,'0') + '/' + String(due.getUTCMonth()+1).padStart(2,'0') + '/' + due.getUTCFullYear();
+      %>
+      <div class="pay-panel pay-boleto">
+        <div class="boleto-head">
+          <div><small>Banco</small><strong>001 — Banco do Brasil</strong></div>
+          <div><small>Vencimento</small><strong><%= dueStr %></strong></div>
+          <div><small>Valor</small><strong><%= brl(bc.amount) %></strong></div>
+        </div>
+        <div class="boleto-line">
+          <small>Linha digitável</small>
+          <div class="line-row">
+            <code id="boletoLine"><%= bc.digitable %></code>
+            <button type="button" class="btn btn-soft btn-sm" id="copyBol">Copiar</button>
+          </div>
+        </div>
+        <div class="boleto-bar">
+          <small>Código de barras</small>
+          <svg id="barSvg" viewBox="0 0 880 80" preserveAspectRatio="none" role="img" aria-label="Código de barras do boleto"></svg>
+          <small class="muted">Após o pagamento, a compensação pode levar até 2 dias úteis.</small>
+        </div>
+      </div>
+      <script>
+        // Code 128-style visual: largura proporcional a cada dígito (representação visual,
+        // não otimizada para leitura por scanner real — basta para apresentação).
+        (function(){
+          const digits = '<%= bc.digits %>';
+          const svg = document.getElementById('barSvg');
+          const totalW = 880;
+          // 47 dígitos → cada dígito vira 2 barras (preta + branca), largura dependente do valor
+          const widths = [];
+          for (let i = 0; i < digits.length; i++) {
+            const v = parseInt(digits[i], 10);
+            widths.push(2 + (v % 3));      // 2..4
+            widths.push(1 + ((v+1) % 3));  // 1..3
+          }
+          const sum = widths.reduce((a,b)=>a+b,0);
+          const scale = totalW / sum;
+          let x = 0;
+          let svgContent = '';
+          widths.forEach((w, i) => {
+            const ww = w * scale;
+            if (i % 2 === 0) svgContent += '<rect x="'+x.toFixed(2)+'" y="0" width="'+ww.toFixed(2)+'" height="80" fill="#000"/>';
+            x += ww;
+          });
+          svg.innerHTML = svgContent;
+        })();
+        document.getElementById('copyBol').addEventListener('click', async () => {
+          const line = '<%= bc.digits %>';
+          try { await navigator.clipboard.writeText(line); }
+          catch {}
+          const b = document.getElementById('copyBol');
+          const old = b.textContent; b.textContent = 'Copiado!';
+          setTimeout(() => b.textContent = old, 1800);
+        });
+      </script>
+    <% } else if (o.payment === 'cartao' && pay.card) { %>
+      <div class="pay-panel pay-card">
+        <div class="card-confirm">
+          <div class="card-brand-tag"><%= pay.card.brand %></div>
+          <div>
+            <strong>Pagamento autorizado</strong>
+            <p class="muted small">Cartão <%= pay.card.brand %> terminado em <strong>•••• <%= pay.card.last4 %></strong> · Titular: <%= pay.card.holder %></p>
+            <p class="muted small">
+              <%= pay.card.installments %>x de <strong><%= brl(o.total / pay.card.installments) %></strong> sem juros · Total <strong><%= brl(o.total) %></strong>
+            </p>
+          </div>
+        </div>
+        <p class="muted small">Você receberá a confirmação por e-mail em alguns minutos.</p>
+      </div>
+    <% } %>
+
+    <div class="track-steps">
+      <% const steps=['pendente','pago','enviado','entregue']; const i=steps.indexOf(o.status); %>
+      <% steps.forEach((s,idx) => { %>
+        <div class="step <%= idx<=i ? 'done' : '' %>"><span><%= idx+1 %></span><%= s %></div>
+      <% }) %>
+    </div>
+
+    <a href="/" class="btn btn-primary">Voltar à loja</a>
+    <a href="/rastrear?code=<%= o.tracking_code %>" class="btn btn-soft">Rastrear pedido</a>
+  </div>
+</section>
+
+<%- include('partials/footer') %>

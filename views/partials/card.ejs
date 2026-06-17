@@ -1,0 +1,16 @@
+<article class="prod-card">
+  <a href="/produto/<%= p.id %>" class="prod-img" style="background-image:url('<%= p.image_url %>')">
+    <% if (p.featured) { %><span class="ribbon">Destaque</span><% } %>
+    <% if (p.stock < 5 && p.stock > 0) { %><span class="ribbon ribbon-warn">Últimas peças</span><% } %>
+    <% if (p.stock === 0) { %><span class="ribbon ribbon-off">Esgotado</span><% } %>
+  </a>
+  <div class="prod-body">
+    <span class="prod-cat"><%= (CATEGORIES.find(c=>c.slug===p.category)||{}).name || p.category %></span>
+    <a href="/produto/<%= p.id %>" class="prod-name"><%= p.name %></a>
+    <div class="prod-price">
+      <strong><%= brl(p.price) %></strong>
+      <small>ou 6x de <%= brl(p.price/6) %></small>
+    </div>
+    <a href="/produto/<%= p.id %>" class="btn btn-soft btn-block">Ver produto</a>
+  </div>
+</article>

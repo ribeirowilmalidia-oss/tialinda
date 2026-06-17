@@ -1,0 +1,52 @@
+<% const title='Pedido #'+o.id; %><%- include('_head') %>
+
+<header class="admin-header">
+  <div>
+    <h1>Pedido #<%= o.id %></h1>
+    <p class="muted">Rastreio: <code><%= o.tracking_code %></code></p>
+  </div>
+  <a href="/admin/pedidos" class="btn btn-ghost btn-sm">← Voltar</a>
+</header>
+
+<div class="admin-grid">
+  <section class="card">
+    <h2>Cliente</h2>
+    <p><strong><%= o.customer_name %></strong><br><%= o.email %><br><%= o.phone %></p>
+    <h3>Endereço de entrega</h3>
+    <p><%= o.address %><br><%= o.city %>/<%= o.state %> · CEP <%= o.cep %></p>
+    <h3>Itens</h3>
+    <% items.forEach(it => { %>
+      <div class="ck-row">
+        <div class="ck-info"><span><%= it.name %></span><small>Qtd: <%= it.qty %> × <%= brl(it.price) %></small></div>
+        <strong><%= brl(it.price*it.qty) %></strong>
+      </div>
+    <% }) %>
+    <hr>
+    <div class="row"><span>Subtotal</span><strong><%= brl(o.subtotal) %></strong></div>
+    <div class="row"><span>Frete</span><strong><%= Number(o.shipping)===0 ? 'Grátis' : brl(o.shipping) %></strong></div>
+    <div class="row total"><span>Total</span><strong><%= brl(o.total) %></strong></div>
+  </section>
+
+  <aside class="card">
+    <h2>Status &amp; Entrega</h2>
+    <p>Status atual: <span class="status status-<%= o.status %>"><%= o.status %></span></p>
+    <form method="post" action="/admin/pedido/<%= o.id %>/status" class="form-card">
+      <label>Atualizar status
+        <select name="status">
+          <% ['pendente','pago','enviado','entregue','cancelado'].forEach(s => { %>
+            <option value="<%= s %>" <%= o.status===s?'selected':'' %>><%= s %></option>
+          <% }) %>
+        </select>
+      </label>
+      <button class="btn btn-primary btn-block">Atualizar</button>
+    </form>
+    <div class="track-steps vertical">
+      <% const steps=['pendente','pago','enviado','entregue']; const i=steps.indexOf(o.status); %>
+      <% steps.forEach((s,idx) => { %>
+        <div class="step <%= idx<=i ? 'done' : '' %>"><span><%= idx+1 %></span><%= s %></div>
+      <% }) %>
+    </div>
+  </aside>
+</div>
+
+<%- include('_foot') %>

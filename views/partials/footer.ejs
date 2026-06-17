@@ -1,0 +1,50 @@
+<footer class="site-footer">
+  <div class="wrap footer-grid">
+    <div>
+      <img src="/img/logo-emblem.png" alt="Tia Linda" class="footer-logo">
+      <p class="muted">Enxoval · Moda · Decoração · Bem-estar.<br>Aconchego para sua casa e cuidado para você, com seleção feita à mão pela Tia Linda.</p>
+      <p class="muted">@_tia_linda_enxovais</p>
+    </div>
+    <div>
+      <h4>Categorias</h4>
+      <ul>
+        <% CATEGORIES.forEach(c => { %>
+          <li><a href="/categoria/<%= c.slug %>"><%= c.name %></a></li>
+        <% }) %>
+      </ul>
+    </div>
+    <div>
+      <h4>Atendimento</h4>
+      <ul>
+        <li><strong style="color:var(--rose-300, #ddc5bc)">Lidia Ribeiro</strong></li>
+        <li>Departamento Comercial</li>
+        <li>
+          <a class="wa-inline" href="https://wa.me/5513996554822?text=Ol%C3%A1!%20Vim%20pelo%20site%20da%20Tia%20Linda%20e%20gostaria%20de%20mais%20informa%C3%A7%C3%B5es." target="_blank" rel="noopener" aria-label="Falar no WhatsApp">
+            <svg class="wa-ico" viewBox="0 0 32 32" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M19.11 17.36c-.27-.14-1.6-.79-1.85-.88-.25-.09-.43-.14-.61.14-.18.27-.7.88-.86 1.06-.16.18-.32.2-.59.07-.27-.14-1.14-.42-2.17-1.34-.8-.71-1.34-1.59-1.5-1.86-.16-.27-.02-.42.12-.55.12-.12.27-.32.41-.48.14-.16.18-.27.27-.45.09-.18.05-.34-.02-.48-.07-.14-.61-1.47-.84-2.01-.22-.53-.45-.46-.61-.47-.16-.01-.34-.01-.52-.01-.18 0-.48.07-.73.34-.25.27-.95.93-.95 2.26 0 1.34.98 2.63 1.11 2.81.14.18 1.93 2.95 4.68 4.13.65.28 1.16.45 1.56.58.65.21 1.25.18 1.72.11.52-.08 1.6-.65 1.83-1.28.23-.62.23-1.16.16-1.28-.07-.11-.25-.18-.52-.32zM16.01 4C9.39 4 4.02 9.37 4.02 16c0 2.11.56 4.18 1.6 6L4 28l6.18-1.62A11.94 11.94 0 0 0 16.01 28C22.63 28 28 22.63 28 16S22.63 4 16.01 4zm0 21.82c-1.83 0-3.62-.49-5.18-1.42l-.37-.22-3.67.96.98-3.58-.24-.37a9.79 9.79 0 0 1-1.52-5.19c0-5.43 4.42-9.84 9.99-9.84 2.67 0 5.18 1.04 7.07 2.93a9.93 9.93 0 0 1 2.93 7.04c0 5.43-4.42 9.69-9.99 9.69z"/></svg>
+            (13) 99655-4822
+          </a>
+        </li>
+        <li>tialindasac@tialinda.com.br</li>
+        <li><a href="/rastrear">Rastrear pedido</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Endereço &amp; Web</h4>
+      <ul>
+        <li>Santos · São Paulo</li>
+        <li>www.tialinda.com.br</li>
+        <li>Frete grátis acima de R$ 199</li>
+        <li>Envio para todo o Brasil</li>
+        <li><a href="/admin">Acesso administrativo</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="copy">© <%= new Date().getFullYear() %> Tia Linda Enxovais · Todos os direitos reservados</div>
+</footer>
+
+<a class="whatsapp-fab" href="https://wa.me/5513996554822?text=Ol%C3%A1!%20Vim%20pelo%20site%20da%20Tia%20Linda%20e%20gostaria%20de%20mais%20informa%C3%A7%C3%B5es." target="_blank" rel="noopener" aria-label="Falar no WhatsApp">
+  <svg viewBox="0 0 32 32" width="28" height="28" aria-hidden="true"><path fill="#fff" d="M19.11 17.36c-.27-.14-1.6-.79-1.85-.88-.25-.09-.43-.14-.61.14-.18.27-.7.88-.86 1.06-.16.18-.32.2-.59.07-.27-.14-1.14-.42-2.17-1.34-.8-.71-1.34-1.59-1.5-1.86-.16-.27-.02-.42.12-.55.12-.12.27-.32.41-.48.14-.16.18-.27.27-.45.09-.18.05-.34-.02-.48-.07-.14-.61-1.47-.84-2.01-.22-.53-.45-.46-.61-.47-.16-.01-.34-.01-.52-.01-.18 0-.48.07-.73.34-.25.27-.95.93-.95 2.26 0 1.34.98 2.63 1.11 2.81.14.18 1.93 2.95 4.68 4.13.65.28 1.16.45 1.56.58.65.21 1.25.18 1.72.11.52-.08 1.6-.65 1.83-1.28.23-.62.23-1.16.16-1.28-.07-.11-.25-.18-.52-.32zM16.01 4C9.39 4 4.02 9.37 4.02 16c0 2.11.56 4.18 1.6 6L4 28l6.18-1.62A11.94 11.94 0 0 0 16.01 28C22.63 28 28 22.63 28 16S22.63 4 16.01 4zm0 21.82c-1.83 0-3.62-.49-5.18-1.42l-.37-.22-3.67.96.98-3.58-.24-.37a9.79 9.79 0 0 1-1.52-5.19c0-5.43 4.42-9.84 9.99-9.84 2.67 0 5.18 1.04 7.07 2.93a9.93 9.93 0 0 1 2.93 7.04c0 5.43-4.42 9.69-9.99 9.69z"/></svg>
+  <span>WhatsApp</span>
+</a>
+</body>
+</html>
