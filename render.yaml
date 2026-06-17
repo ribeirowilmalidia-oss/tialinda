@@ -1,11 +1,17 @@
-# Render Blueprint - https://render.com/docs/blueprint-spec
-# Faz deploy automático ao push em main.
+# Render Blueprint — cria web service + PostgreSQL grátis e conecta tudo.
+# Doc: https://render.com/docs/blueprint-spec
+databases:
+  - name: tialinda-db
+    plan: free
+    databaseName: tialinda
+    user: tialinda
+
 services:
   - type: web
     name: tialinda
     runtime: node
     plan: free                # mude para "starter" depois para evitar cold start
-    region: oregon            # mude para "frankfurt" se preferir latência menor
+    region: oregon
     branch: main
     autoDeploy: true
     buildCommand: npm install
@@ -15,9 +21,11 @@ services:
       - key: NODE_ENV
         value: production
       - key: DATABASE_URL
-        sync: false           # você cola o valor manualmente no painel
+        fromDatabase:
+          name: tialinda-db
+          property: connectionString
       - key: ADMIN_PASSWORD
-        sync: false
+        sync: false           # você define no painel do Render
       - key: PIX_KEY
         value: ee9e688b-ee8f-4c7d-86e9-7abc7d971cc6
       - key: PIX_NAME

@@ -1,10 +1,97 @@
-// DB adapter: usa MySQL (TiDB) em produção via DATABASE_URL, SQLite local caso contrário.
+// DB adapter — escolhe driver automaticamente baseado em DATABASE_URL.
+//   postgres://... ou postgresql://... → PostgreSQL (Render, Neon, Supabase)
+//   mysql://...                        → MySQL (TiDB Cloud, PlanetScale)
+//   (sem DATABASE_URL)                 → SQLite local (better-sqlite3) — dev
+//
+// A API exposta é a mesma do mysql2/promise:
+//   pool.execute(sql, params) => [rows | {insertId, affectedRows}, fields]
+//   pool.getConnection() => { beginTransaction, commit, rollback, execute, release }
 const path = require('path');
 
-if (process.env.DATABASE_URL) {
+const URL = process.env.DATABASE_URL || '';
+
+if (URL.startsWith('postgres://') || URL.startsWith('postgresql://')) {
+  module.exports = makePgAdapter(URL);
+} else if (URL.startsWith('mysql://')) {
   const mysql = require('mysql2/promise');
-  module.exports = mysql.createPool(process.env.DATABASE_URL);
+  module.exports = mysql.createPool(URL);
 } else {
+  module.exports = makeSqliteAdapter();
+}
+
+// ============================================================
+// PostgreSQL adapter — traduz SQL MySQL → PG e mantém API mysql2
+// ============================================================
+function makePgAdapter(connectionString) {
+  const { Pool } = require('pg');
+  const pool = new Pool({
+    connectionString,
+    ssl: connectionString.includes('localhost') ? false : { rejectUnauthorized: false },
+    max: 10
+  });
+
+  function translate(sql) {
+    let t = sql
+      // Schema differences
+      .replace(/\bINT\s+AUTO_INCREMENT\s+PRIMARY\s+KEY\b/gi, 'SERIAL PRIMARY KEY')
+      .replace(/\bAUTO_INCREMENT\b/gi, '')
+      .replace(/\bTINYINT\b/gi, 'SMALLINT')
+      .replace(/\bDATETIME\b/gi, 'TIMESTAMP')
+      // Functions
+      .replace(/\bRAND\s*\(\s*\)/gi, 'RANDOM()')
+      // Conflict on duplicate (raríssimo no projeto; manter no-op)
+      ;
+    // ? → $1, $2, $3 ...
+    let i = 0;
+    t = t.replace(/\?/g, () => '$' + (++i));
+    return t;
+  }
+
+  function isInsert(sql) { return /^\s*insert\s+/i.test(sql); }
+  function isSelect(sql) { return /^\s*select\s+/i.test(sql); }
+  function isDdl(sql)    { return /^\s*(create|alter|drop)\s+/i.test(sql); }
+  function hasReturning(sql) { return /\breturning\b/i.test(sql); }
+
+  async function run(client, sql, params) {
+    let q = translate(sql);
+    // Para INSERTs sem RETURNING, anexa "RETURNING id" para emular insertId do mysql2
+    if (isInsert(q) && !hasReturning(q)) q = q + ' RETURNING id';
+    const res = await client.query(q, params || []);
+    if (isSelect(q) || hasReturning(q)) {
+      const rows = res.rows;
+      // mysql2: [rows, fields]. INSERT...RETURNING id: simula {insertId, affectedRows}.
+      if (isInsert(sql) && rows.length) {
+        return [{ insertId: rows[0].id, affectedRows: res.rowCount }, undefined];
+      }
+      return [rows, undefined];
+    }
+    if (isDdl(q)) return [{ affectedRows: 0 }, undefined];
+    // UPDATE / DELETE
+    return [{ affectedRows: res.rowCount, insertId: 0 }, undefined];
+  }
+
+  return {
+    async execute(sql, params) {
+      return run(pool, sql, params);
+    },
+    async getConnection() {
+      const client = await pool.connect();
+      let inTx = false;
+      return {
+        async beginTransaction() { await client.query('BEGIN'); inTx = true; },
+        async commit() { await client.query('COMMIT'); inTx = false; },
+        async rollback() { if (inTx) { await client.query('ROLLBACK'); inTx = false; } },
+        async execute(sql, params) { return run(client, sql, params); },
+        release() { client.release(); }
+      };
+    }
+  };
+}
+
+// ============================================================
+// SQLite adapter (dev local)
+// ============================================================
+function makeSqliteAdapter() {
   const Database = require('better-sqlite3');
   const db = new Database(path.join(__dirname, 'data.db'));
   db.pragma('journal_mode = WAL');
@@ -37,7 +124,7 @@ if (process.env.DATABASE_URL) {
     return [{ insertId: r.lastInsertRowid, affectedRows: r.changes }];
   }
 
-  module.exports = {
+  return {
     async execute(sql, params) { return exec(sql, params); },
     async getConnection() {
       let inTx = false;
