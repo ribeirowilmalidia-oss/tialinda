@@ -5,6 +5,7 @@ const cookieParser = require('cookie-parser');
 const bodyParser = require('body-parser');
 const pool = require('./db');
 const payments = require('./lib/payments');
+const mailer = require('./lib/mailer');
 
 // Chave PIX e dados do recebedor (Mercado Pago - Wilma Lidia Ribeiro)
 const PIX_KEY     = process.env.PIX_KEY     || 'ee9e688b-ee8f-4c7d-86e9-7abc7d971cc6';
@@ -275,6 +276,12 @@ app.post('/checkout/finalizar', async (req, res) => {
     }
     await conn.commit();
     res.cookie('cart', '[]', { maxAge: 0 });
+    // Dispara e-mails de confirmação (cliente + admin) sem bloquear resposta.
+    mailer.sendOrderConfirmation(
+      { id: orderId, customer_name: name, email, phone, cep, address, city, state,
+        subtotal: detail.subtotal, shipping, total, payment, tracking_code: tracking },
+      detail.items
+    ).catch(err => console.error('[mailer] falha ao enviar pedido #' + orderId + ':', err.message));
     if (cardInfo) {
       res.cookie('last_card', JSON.stringify({ ...cardInfo, orderId }), {
         httpOnly: false, sameSite: 'lax', maxAge: 30 * 60 * 1000, path: '/'

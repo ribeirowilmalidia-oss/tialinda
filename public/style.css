@@ -99,6 +99,8 @@ h3{font-size:22px;margin:18px 0 10px}
 .btn-ghost:hover{background:var(--rose-50);border-color:var(--rose-200)}
 .btn-soft{background:var(--rose-50);color:var(--rose-600);border:1px solid var(--rose-100)}
 .btn-soft:hover{background:var(--rose-100)}
+.btn-wa{background:#25D366;color:#fff;border:1px solid #25D366;display:inline-flex;align-items:center;justify-content:center}
+.btn-wa:hover{background:#1da851;border-color:#1da851;color:#fff}
 .btn-dark{background:var(--ink);color:#fff}
 .btn-dark:hover{background:var(--rose-500)}
 .btn-danger{background:#fce8e8;color:var(--red);border:1px solid #f3c8c8}

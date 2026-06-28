@@ -32,3 +32,15 @@ services:
         value: Wilma Lidia Ribeiro
       - key: PIX_CITY
         value: Santos
+      - key: SMTP_HOST
+        sync: false           # ex.: smtp.gmail.com
+      - key: SMTP_PORT
+        value: '587'
+      - key: SMTP_USER
+        sync: false           # ex.: tialindasac@gmail.com
+      - key: SMTP_PASS
+        sync: false           # Gmail App Password (16 caracteres)
+      - key: MAIL_FROM
+        value: tialindasac@tialinda.com.br
+      - key: MAIL_ADMIN
+        value: tialindasac@tialinda.com.br
