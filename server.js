@@ -481,21 +481,19 @@ app.post('/admin/importar', adminAuth, express.json({ limit: '4mb' }), async (re
   res.json({ ok: true, total: items.length, inserted, skipped, errors });
 });
 
-// Diagnóstico de SMTP — mostra config ativa e tenta enviar um e-mail de teste
+// Diagnóstico de e-mail — mostra config ativa e tenta enviar um e-mail de teste
 app.get('/admin/email-test', adminAuth, async (req, res) => {
   const cfg = {
-    SMTP_HOST: process.env.SMTP_HOST || '(não definido)',
-    SMTP_PORT: process.env.SMTP_PORT || '(não definido)',
-    SMTP_USER: process.env.SMTP_USER || '(não definido)',
-    SMTP_PASS: process.env.SMTP_PASS ? '✓ definido (' + process.env.SMTP_PASS.length + ' chars)' : '(não definido)',
-    MAIL_FROM: process.env.MAIL_FROM || '(não definido)',
-    MAIL_ADMIN: process.env.MAIL_ADMIN || '(não definido)'
+    ZEPTO_TOKEN: process.env.ZEPTO_TOKEN ? '✓ definido (' + process.env.ZEPTO_TOKEN.length + ' chars)' : '(não definido)',
+    MAIL_FROM: process.env.MAIL_FROM || '(não definido — usando default)',
+    MAIL_ADMIN: process.env.MAIL_ADMIN || '(não definido — usando default)',
+    SITE_URL: process.env.SITE_URL || '(não definido — usando default)'
   };
   const result = await mailer.send({
     to: process.env.MAIL_ADMIN || 'tialindasac@tialinda.com.br',
-    subject: '[DIAG] Teste de e-mail do servidor — ' + new Date().toISOString(),
-    html: '<h2>Diagnóstico SMTP</h2><p>Se você está lendo isto, o SMTP do Render está funcionando.</p><pre>' + JSON.stringify(cfg, null, 2) + '</pre>',
-    text: 'Teste de diagnóstico SMTP'
+    subject: '[DIAG] Teste ZeptoMail — ' + new Date().toISOString(),
+    html: '<h2>Diagnóstico ZeptoMail</h2><p>Se você está lendo isto, a API HTTP do ZeptoMail está funcionando no Render.</p><pre>' + JSON.stringify(cfg, null, 2) + '</pre>',
+    text: 'Teste de diagnóstico ZeptoMail'
   });
   res.json({ config: cfg, sendResult: result });
 });
