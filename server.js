@@ -481,6 +481,25 @@ app.post('/admin/importar', adminAuth, express.json({ limit: '4mb' }), async (re
   res.json({ ok: true, total: items.length, inserted, skipped, errors });
 });
 
+// Diagnóstico de SMTP — mostra config ativa e tenta enviar um e-mail de teste
+app.get('/admin/email-test', adminAuth, async (req, res) => {
+  const cfg = {
+    SMTP_HOST: process.env.SMTP_HOST || '(não definido)',
+    SMTP_PORT: process.env.SMTP_PORT || '(não definido)',
+    SMTP_USER: process.env.SMTP_USER || '(não definido)',
+    SMTP_PASS: process.env.SMTP_PASS ? '✓ definido (' + process.env.SMTP_PASS.length + ' chars)' : '(não definido)',
+    MAIL_FROM: process.env.MAIL_FROM || '(não definido)',
+    MAIL_ADMIN: process.env.MAIL_ADMIN || '(não definido)'
+  };
+  const result = await mailer.send({
+    to: process.env.MAIL_ADMIN || 'tialindasac@tialinda.com.br',
+    subject: '[DIAG] Teste de e-mail do servidor — ' + new Date().toISOString(),
+    html: '<h2>Diagnóstico SMTP</h2><p>Se você está lendo isto, o SMTP do Render está funcionando.</p><pre>' + JSON.stringify(cfg, null, 2) + '</pre>',
+    text: 'Teste de diagnóstico SMTP'
+  });
+  res.json({ config: cfg, sendResult: result });
+});
+
 // Remove produtos seed (identificados pela URL de imagem do Unsplash)
 app.post('/admin/limpar-seed', adminAuth, async (req, res) => {
   const [r] = await pool.execute("DELETE FROM products WHERE image_url LIKE '%unsplash%'");
