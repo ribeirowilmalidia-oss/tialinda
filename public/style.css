@@ -177,6 +177,8 @@ h3{font-size:22px;margin:18px 0 10px}
 .checkout-fields input,.checkout-fields select,.checkout-fields textarea,.form-card input,.form-card select,.form-card textarea{padding:12px 14px;border:1px solid var(--line);border-radius:10px;font-size:15px;font-family:inherit;color:var(--ink);background:#fff}
 .checkout-fields input:focus,.form-card input:focus{outline:none;border-color:var(--rose-400);box-shadow:0 0 0 3px rgba(196,90,74,.1)}
 .row-2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.checkout-fields .row-3{display:grid;grid-template-columns:.6fr 1fr 1.2fr;gap:14px}
+@media (max-width:640px){.checkout-fields .row-3{grid-template-columns:1fr}}
 .pay-options{display:flex;flex-direction:column;gap:10px}
 .pay-options label{flex-direction:row;align-items:center;gap:10px;color:var(--ink-2);font-size:15px;padding:12px;border:1px solid var(--line);border-radius:10px;cursor:pointer;margin:0}
 .pay-options label:has(input:checked){border-color:var(--rose-400);background:var(--rose-50)}

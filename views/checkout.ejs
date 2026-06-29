@@ -21,9 +21,15 @@
           <label>Cidade <input name="city" id="city" required></label>
         </div>
         <div class="row-2">
-          <label>Endereço <input name="address" id="address" placeholder="Rua, número, bairro" required></label>
+          <label>Rua / Logradouro <input id="street" placeholder="Av. Conselheiro Nébias" required></label>
           <label>UF <input name="state" id="state" maxlength="2" placeholder="SP" required></label>
         </div>
+        <div class="row-3">
+          <label>Número <input id="number" inputmode="numeric" placeholder="123" required></label>
+          <label>Complemento <input id="complement" placeholder="Apto 42, bloco B"></label>
+          <label>Bairro <input id="neighborhood" placeholder="Vila Mathias"></label>
+        </div>
+        <input type="hidden" name="address" id="address">
         <button type="button" id="btnFrete" class="btn btn-soft">Calcular frete</button>
         <p id="freteResult" class="muted" aria-live="polite"></p>
       </fieldset>
@@ -93,6 +99,10 @@ function digits(s){return (s||'').replace(/\D/g,'')}
 
 const cepInput   = document.getElementById('cep');
 const addrInput  = document.getElementById('address');
+const streetInput= document.getElementById('street');
+const numberInput= document.getElementById('number');
+const compInput  = document.getElementById('complement');
+const neighInput = document.getElementById('neighborhood');
 const cityInput  = document.getElementById('city');
 const stateInput = document.getElementById('state');
 const sumShip    = document.getElementById('sumShip');
@@ -113,11 +123,11 @@ async function lookupAndCalc(cep){
     const v = await r.json();
     if (v.erro) { freteMsg.textContent = 'CEP não encontrado.'; return; }
     // Autofill (mantém o que o usuário digitou se já houver)
-    if (!addrInput.value.trim() && v.logradouro) {
-      addrInput.value = v.logradouro + (v.bairro ? ' - ' + v.bairro : '');
-    }
-    if (!cityInput.value.trim() && v.localidade) cityInput.value = v.localidade;
-    if (!stateInput.value.trim() && v.uf) stateInput.value = v.uf;
+    if (!streetInput.value.trim() && v.logradouro) streetInput.value = v.logradouro;
+    if (!neighInput.value.trim()  && v.bairro)     neighInput.value  = v.bairro;
+    if (!cityInput.value.trim()   && v.localidade) cityInput.value   = v.localidade;
+    if (!stateInput.value.trim()  && v.uf)         stateInput.value  = v.uf;
+    if (v.logradouro && numberInput) numberInput.focus();
   } catch(e) {
     freteMsg.textContent = 'Não foi possível buscar o endereço, mas o frete será calculado.';
   }
@@ -207,6 +217,14 @@ function luhn(num){
   return sum % 10 === 0;
 }
 document.getElementById('checkoutForm').addEventListener('submit', (e) => {
+  // Monta o endereço completo no hidden field
+  const parts = [];
+  if (streetInput.value.trim()) parts.push(streetInput.value.trim());
+  if (numberInput.value.trim()) parts.push('nº ' + numberInput.value.trim());
+  if (compInput.value.trim())   parts.push(compInput.value.trim());
+  if (neighInput.value.trim())  parts.push(neighInput.value.trim());
+  addrInput.value = parts.join(', ');
+
   const pay = document.querySelector('input[name="payment"]:checked').value;
   if (pay === 'cartao' && !luhn(cardNum.value)) {
     e.preventDefault();
