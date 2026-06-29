@@ -30,7 +30,9 @@
           <label>Bairro <input id="neighborhood" placeholder="Vila Mathias"></label>
         </div>
         <input type="hidden" name="address" id="address">
+        <input type="hidden" name="shipping_service" id="shipping_service" value="PAC">
         <button type="button" id="btnFrete" class="btn btn-soft">Calcular frete</button>
+        <div id="freteOptions" class="frete-options" hidden></div>
         <p id="freteResult" class="muted" aria-live="polite"></p>
       </fieldset>
       <fieldset>
@@ -138,12 +140,40 @@ async function calcFrete(cep){
   try {
     const r = await fetch('/checkout/frete', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({cep})});
     const d = await r.json();
-    sumShip.textContent  = d.free ? 'Grátis' : brl(d.shipping);
-    sumTotal.textContent = brl(d.total);
-    freteMsg.textContent = d.free ? 'Você ganhou frete grátis!' : 'Frete para ' + cep.slice(0,5) + '-' + cep.slice(5) + ': ' + brl(d.shipping);
+    if (d.error) { freteMsg.textContent = d.error; return; }
+    renderFreteOptions(d.options);
+    freteMsg.textContent = 'Escolha a forma de envio:';
   } catch(e) {
     freteMsg.textContent = 'Falha ao calcular o frete. Tente novamente.';
   }
+}
+
+function renderFreteOptions(options){
+  const box = document.getElementById('freteOptions');
+  box.hidden = false;
+  box.innerHTML = options.map((o, i) => `
+    <label class="frete-opt">
+      <input type="radio" name="shipping_choice" value="${o.service}" data-price="${o.price}" ${i===0?'checked':''}>
+      <div class="frete-info">
+        <strong>${o.service}</strong>
+        <small>${o.days} dias úteis</small>
+      </div>
+      <span class="frete-price">${o.free ? 'Grátis' : brl(o.price)}</span>
+    </label>
+  `).join('');
+  box.querySelectorAll('input[name="shipping_choice"]').forEach(r => {
+    r.addEventListener('change', updateTotalFromChoice);
+  });
+  updateTotalFromChoice();
+}
+
+function updateTotalFromChoice(){
+  const sel = document.querySelector('input[name="shipping_choice"]:checked');
+  if (!sel) return;
+  const price = parseFloat(sel.dataset.price);
+  document.getElementById('shipping_service').value = sel.value;
+  sumShip.textContent  = price === 0 ? 'Grátis' : brl(price);
+  sumTotal.textContent = brl(sub + price);
 }
 
 document.getElementById('btnFrete').addEventListener('click', () => {

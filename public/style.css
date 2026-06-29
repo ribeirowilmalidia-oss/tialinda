@@ -179,6 +179,13 @@ h3{font-size:22px;margin:18px 0 10px}
 .row-2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .checkout-fields .row-3{display:grid;grid-template-columns:.6fr 1fr 1.2fr;gap:14px}
 @media (max-width:640px){.checkout-fields .row-3{grid-template-columns:1fr}}
+.frete-options{display:flex;flex-direction:column;gap:8px;margin:14px 0}
+.frete-opt{display:grid;grid-template-columns:24px 1fr auto;gap:14px;align-items:center;padding:14px;border:1px solid var(--line);border-radius:10px;cursor:pointer;margin:0}
+.frete-opt:has(input:checked){border-color:var(--rose-400);background:var(--rose-50)}
+.frete-info{display:flex;flex-direction:column;gap:2px}
+.frete-info strong{color:var(--ink);font-size:15px}
+.frete-info small{color:var(--muted);font-size:12px}
+.frete-price{color:var(--ink);font-weight:600}
 .pay-options{display:flex;flex-direction:column;gap:10px}
 .pay-options label{flex-direction:row;align-items:center;gap:10px;color:var(--ink-2);font-size:15px;padding:12px;border:1px solid var(--line);border-radius:10px;cursor:pointer;margin:0}
 .pay-options label:has(input:checked){border-color:var(--rose-400);background:var(--rose-50)}

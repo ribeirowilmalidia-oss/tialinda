@@ -6,6 +6,7 @@ const bodyParser = require('body-parser');
 const pool = require('./db');
 const payments = require('./lib/payments');
 const mailer = require('./lib/mailer');
+const correios = require('./lib/correios');
 
 // Chave PIX e dados do recebedor (Mercado Pago - Wilma Lidia Ribeiro)
 const PIX_KEY     = process.env.PIX_KEY     || 'ee9e688b-ee8f-4c7d-86e9-7abc7d971cc6';
@@ -273,15 +274,31 @@ app.get('/checkout', async (req, res) => {
 
 app.post('/checkout/frete', async (req, res) => {
   const detail = await cartDetail(getCart(req));
-  const shipping = calcShipping(req.body.cep, detail.subtotal);
-  res.json({ shipping, total: detail.subtotal + shipping, free: shipping === 0 });
+  const pkg = correios.packageFromItems(detail.items);
+  const quote = correios.calcShipping(req.body.cep, pkg);
+  if (!quote) return res.json({ error: 'CEP inválido' });
+
+  const freeShipping = detail.subtotal >= SHIPPING_FREE_THRESHOLD;
+  const options = [
+    { service: 'PAC',   price: freeShipping ? 0 : quote.pac.price,   days: quote.pac.days,   free: freeShipping },
+    { service: 'SEDEX', price: quote.sedex.price, days: quote.sedex.days, free: false }
+  ];
+  res.json({ options, subtotal: detail.subtotal, billedKg: quote.billedKg });
 });
 
 app.post('/checkout/finalizar', async (req, res) => {
   const detail = await cartDetail(getCart(req));
   if (!detail.items.length) return res.redirect('/carrinho');
   const { name, email, phone, cep, address, city, state, payment } = req.body;
-  const shipping = calcShipping(cep, detail.subtotal);
+  const shippingService = (req.body.shipping_service || 'PAC').toUpperCase();
+  const pkg = correios.packageFromItems(detail.items);
+  const quote = correios.calcShipping(cep, pkg);
+  let shipping = 0, shippingDays = 0;
+  if (quote) {
+    const opt = shippingService === 'SEDEX' ? quote.sedex : quote.pac;
+    shipping = (detail.subtotal >= SHIPPING_FREE_THRESHOLD && shippingService === 'PAC') ? 0 : opt.price;
+    shippingDays = opt.days;
+  }
   const total = detail.subtotal + shipping;
   const tracking = genTrack();
 
