@@ -174,6 +174,50 @@ app.get('/', async (req, res) => {
   res.render('home', { featured, latest });
 });
 
+// ---------- SEO: robots.txt + sitemap.xml ----------
+const SITE_BASE = (process.env.SITE_URL || 'https://tialinda.com.br').replace(/\/$/, '');
+
+app.get('/robots.txt', (req, res) => {
+  res.type('text/plain').send(
+    'User-agent: *\n' +
+    'Allow: /\n' +
+    'Disallow: /admin\n' +
+    'Disallow: /carrinho\n' +
+    'Disallow: /checkout\n' +
+    'Disallow: /pedido/\n' +
+    'Disallow: /rastrear\n\n' +
+    'Sitemap: ' + SITE_BASE + '/sitemap.xml\n'
+  );
+});
+
+app.get('/sitemap.xml', async (req, res) => {
+  const today = new Date().toISOString().slice(0, 10);
+  const urls = [
+    { loc: SITE_BASE + '/', priority: '1.0', changefreq: 'daily' }
+  ];
+  for (const c of CATEGORIES) {
+    urls.push({ loc: SITE_BASE + '/categoria/' + c.slug, priority: '0.8', changefreq: 'weekly' });
+  }
+  try {
+    const [prods] = await pool.execute('SELECT id, created_at FROM products ORDER BY id');
+    for (const p of prods) {
+      const lastmod = p.created_at ? new Date(p.created_at).toISOString().slice(0, 10) : today;
+      urls.push({ loc: SITE_BASE + '/produto/' + p.id, priority: '0.7', changefreq: 'weekly', lastmod });
+    }
+  } catch (e) { console.error('[sitemap] erro:', e.message); }
+  const xml = '<?xml version="1.0" encoding="UTF-8"?>\n' +
+    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
+    urls.map(u =>
+      '  <url>\n' +
+      '    <loc>' + u.loc + '</loc>\n' +
+      '    <lastmod>' + (u.lastmod || today) + '</lastmod>\n' +
+      '    <changefreq>' + u.changefreq + '</changefreq>\n' +
+      '    <priority>' + u.priority + '</priority>\n' +
+      '  </url>'
+    ).join('\n') + '\n</urlset>\n';
+  res.type('application/xml').send(xml);
+});
+
 app.get('/categoria/:slug', async (req, res) => {
   const cat = CATEGORIES.find(c => c.slug === req.params.slug);
   if (!cat) return res.status(404).render('404');
