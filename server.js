@@ -318,7 +318,7 @@ app.post('/checkout/finalizar', async (req, res) => {
       last4: payments.cardLast4(num),
       holder,
       expiry: exp,
-      installments: Math.max(1, Math.min(6, parseInt(req.body.installments || '1', 10)))
+      installments: Math.max(1, Math.min(3, parseInt(req.body.installments || '1', 10)))
     };
   }
 
