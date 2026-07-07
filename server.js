@@ -334,25 +334,85 @@ app.post('/checkout/finalizar', async (req, res) => {
 
   res.cookie('cart', '[]', { maxAge: 0 });
 
-  // Cria preferência no Mercado Pago
-  const pref = await mp.createPreference(
-    { id: orderId, customer_name: name, email, phone, cep, address, city, state,
-      subtotal: detail.subtotal, shipping, total },
-    detail.items
-  );
+  // Redireciona para a tela de pagamento (Bricks) dentro do site
+  cookieRedirect(res, '/pagamento/' + orderId + '?t=' + tracking, 'Preparando pagamento');
+});
 
-  if (pref.error) {
-    console.error('[checkout] MP falhou pedido #' + orderId + ':', pref.error);
-    // Cai pra tela de pedido com aviso
-    return cookieRedirect(res, '/pedido/' + orderId + '?erro=pagamento', 'Redirecionando');
+// Tela de pagamento (Bricks) — PIX, cartão e boleto direto no site
+app.get('/pagamento/:id', async (req, res) => {
+  const [[o]] = await pool.execute('SELECT * FROM orders WHERE id=?', [req.params.id]);
+  if (!o) return res.status(404).render('404');
+  if (o.status === 'pago') return res.redirect('/pedido/' + o.id);
+  const [items] = await pool.execute('SELECT * FROM order_items WHERE order_id=?', [o.id]);
+  res.render('payment', { o, items, mpPublicKey: mp.PUBLIC_KEY });
+});
+
+// Endpoint chamado pelo Bricks JS para processar pagamento
+app.post('/api/pagamento/processar', express.json(), async (req, res) => {
+  const orderId = parseInt(req.body.orderId, 10);
+  const [[o]] = await pool.execute('SELECT * FROM orders WHERE id=?', [orderId]);
+  if (!o) return res.status(404).json({ error: 'Pedido não encontrado' });
+  if (o.status === 'pago') return res.json({ status: 'approved', already: true });
+
+  const paymentData = req.body.paymentData || {};
+
+  // Monta o body pra API do MP baseado no que veio do Bricks
+  const body = {
+    transaction_amount: Number(o.total),
+    description: 'Pedido #' + o.id + ' - Tia Linda Enxovais',
+    external_reference: String(o.id),
+    payment_method_id: paymentData.payment_method_id,
+    payer: {
+      email: o.email,
+      first_name: (o.customer_name || '').split(' ')[0] || 'Cliente',
+      last_name: (o.customer_name || '').split(' ').slice(1).join(' ') || 'Tia Linda',
+      identification: paymentData.payer && paymentData.payer.identification
+    },
+    notification_url: (process.env.SITE_URL || 'https://tialinda.com.br').replace(/\/$/,'') + '/webhook/mercadopago'
+  };
+
+  // Cartão de crédito/débito
+  if (paymentData.token) {
+    body.token = paymentData.token;
+    body.installments = paymentData.installments || 1;
+    body.issuer_id = paymentData.issuer_id;
   }
 
-  // Guarda preference_id no pedido (opcional; ignora erro)
-  pool.execute('UPDATE orders SET mp_preference_id=? WHERE id=?', [pref.id, orderId])
-    .catch(() => {});
+  const result = await mp.createPayment(body, 'order-' + o.id + '-' + Date.now());
 
-  // Redireciona pro checkout do Mercado Pago
-  cookieRedirect(res, pref.init_point, 'Redirecionando ao Mercado Pago');
+  if (result.error) {
+    return res.status(400).json({ error: result.error, details: result.details });
+  }
+
+  const p = result.payment;
+  const newStatus = mp.mapStatus(p.status);
+
+  await pool.execute('UPDATE orders SET status=?, mp_payment_id=? WHERE id=?',
+    [newStatus, String(p.id), o.id]).catch(() => {});
+
+  // Se aprovado imediatamente (cartão), dispara e-mail
+  if (newStatus === 'pago') {
+    const [items] = await pool.execute('SELECT * FROM order_items WHERE order_id=?', [o.id]);
+    mailer.sendOrderConfirmation({ ...o, status: 'pago' }, items)
+      .catch(err => console.error('[mailer]', err.message));
+  }
+
+  // Devolve dados úteis pro frontend (QR do PIX, código do boleto, etc)
+  res.json({
+    id: p.id,
+    status: p.status,
+    status_detail: p.status_detail,
+    payment_method_id: p.payment_method_id,
+    point_of_interaction: p.point_of_interaction, // PIX QR aqui
+    transaction_details: p.transaction_details    // boleto external_resource_url
+  });
+});
+
+// Consulta status do pedido (polling do frontend enquanto aguarda PIX)
+app.get('/api/pagamento/status/:id', async (req, res) => {
+  const [[o]] = await pool.execute('SELECT id, status FROM orders WHERE id=?', [req.params.id]);
+  if (!o) return res.status(404).json({ error: 'not found' });
+  res.json({ id: o.id, status: o.status });
 });
 
 // Cliente retorna do Mercado Pago (success / pending / failure)

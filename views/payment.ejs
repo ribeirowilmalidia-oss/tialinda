@@ -1,0 +1,193 @@
+<% const title = 'Pagamento — Pedido #' + o.id; %><%- include('partials/header') %>
+
+<section class="wrap section">
+  <nav class="crumbs"><a href="/">Início</a> · <a href="/carrinho">Carrinho</a> · <span>Pagamento</span></nav>
+  <h1>Pagamento do pedido #<%= o.id %></h1>
+
+  <div class="pay-grid">
+    <div class="pay-main">
+      <div id="paymentBrick_container"></div>
+      <div id="statusBrick_container"></div>
+      <div id="pixResult" hidden></div>
+      <div id="boletoResult" hidden></div>
+      <div id="paymentLoading" class="pay-loading">Carregando meios de pagamento…</div>
+    </div>
+
+    <aside class="pay-summary">
+      <h3>Resumo</h3>
+      <% items.forEach(it => { %>
+        <div class="ck-row">
+          <div class="ck-info"><span><%= it.name %></span><small>Qtd: <%= it.qty %></small></div>
+          <strong><%= brl(it.price * it.qty) %></strong>
+        </div>
+      <% }) %>
+      <hr>
+      <div class="row"><span>Subtotal</span><strong><%= brl(o.subtotal) %></strong></div>
+      <div class="row"><span>Frete</span><strong><%= brl(o.shipping) %></strong></div>
+      <div class="row total"><span>Total</span><strong><%= brl(o.total) %></strong></div>
+      <p class="muted small">Cliente: <%= o.customer_name %><br>E-mail: <%= o.email %></p>
+    </aside>
+  </div>
+</section>
+
+<script src="https://sdk.mercadopago.com/js/v2"></script>
+<script>
+const mp = new MercadoPago('<%= mpPublicKey %>', { locale: 'pt-BR' });
+
+const bricksBuilder = mp.bricks();
+const orderId = <%= o.id %>;
+const totalAmount = <%= o.total %>;
+
+async function renderPaymentBrick() {
+  const settings = {
+    initialization: {
+      amount: totalAmount,
+      payer: { email: '<%= o.email %>' }
+    },
+    customization: {
+      paymentMethods: {
+        creditCard: 'all',
+        debitCard: 'all',
+        bankTransfer: ['pix'],
+        ticket: 'all',
+        maxInstallments: 3
+      },
+      visual: {
+        style: {
+          theme: 'default',
+          customVariables: {
+            baseColor: '#c4593a',
+            baseColorFirstVariant: '#9a3b2c',
+            baseColorSecondVariant: '#f5ede4'
+          }
+        }
+      }
+    },
+    callbacks: {
+      onReady: () => {
+        document.getElementById('paymentLoading').style.display = 'none';
+      },
+      onError: (error) => {
+        console.error('Brick error:', error);
+        alert('Erro ao carregar pagamento: ' + (error.message || 'Tente novamente'));
+      },
+      onSubmit: ({ selectedPaymentMethod, formData }) => {
+        return new Promise((resolve, reject) => {
+          fetch('/api/pagamento/processar', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ orderId, paymentData: formData, method: selectedPaymentMethod })
+          })
+          .then(r => r.json())
+          .then(data => {
+            if (data.error) {
+              alert('Erro no pagamento: ' + data.error);
+              reject();
+              return;
+            }
+            handlePaymentResult(data);
+            resolve();
+          })
+          .catch(err => {
+            alert('Erro de rede: ' + err.message);
+            reject();
+          });
+        });
+      }
+    }
+  };
+  await bricksBuilder.create('payment', 'paymentBrick_container', settings);
+}
+
+function handlePaymentResult(data) {
+  const st = data.status;
+  const method = data.payment_method_id;
+
+  // Cartão aprovado → vai pro pedido
+  if (st === 'approved') {
+    window.location.href = '/pedido/' + orderId;
+    return;
+  }
+
+  // PIX pendente → mostra QR
+  if (method === 'pix' && data.point_of_interaction && data.point_of_interaction.transaction_data) {
+    const tx = data.point_of_interaction.transaction_data;
+    document.getElementById('paymentBrick_container').style.display = 'none';
+    const box = document.getElementById('pixResult');
+    box.hidden = false;
+    box.innerHTML = `
+      <div class="pix-result">
+        <h2>Pague com PIX</h2>
+        <p>Escaneie o QR Code com seu app de banco ou copie o código abaixo. O pagamento é confirmado em segundos.</p>
+        <div class="pix-qr-wrap">
+          <img src="data:image/png;base64,${tx.qr_code_base64}" alt="QR Code PIX" width="280" height="280">
+        </div>
+        <p><strong>Ou copie o código PIX (Copia e Cola):</strong></p>
+        <textarea readonly rows="4" onclick="this.select()">${tx.qr_code}</textarea>
+        <button class="btn btn-primary" onclick="navigator.clipboard.writeText(\`${tx.qr_code}\`); this.textContent='✓ Código copiado'">Copiar código PIX</button>
+        <p class="muted small">Após pagar, aguarde alguns segundos e você será redirecionado. Ou <a href="/pedido/${orderId}">clique aqui</a>.</p>
+      </div>
+    `;
+    // Polling do status a cada 5s
+    startPolling();
+    return;
+  }
+
+  // Boleto → mostra link
+  if ((method === 'bolbradesco' || method === 'boleto') && data.transaction_details && data.transaction_details.external_resource_url) {
+    document.getElementById('paymentBrick_container').style.display = 'none';
+    const box = document.getElementById('boletoResult');
+    box.hidden = false;
+    box.innerHTML = `
+      <div class="boleto-result">
+        <h2>Boleto gerado</h2>
+        <p>Seu boleto foi gerado com sucesso. Vence em 3 dias úteis.</p>
+        <a href="${data.transaction_details.external_resource_url}" target="_blank" class="btn btn-primary btn-lg">📄 Ver e imprimir boleto</a>
+        <p class="muted small">Após o pagamento (compensa em 1-2 dias úteis), você receberá e-mail de confirmação.</p>
+      </div>
+    `;
+    return;
+  }
+
+  // Pendente/outro
+  alert('Pagamento recebido. Status: ' + st + '. Você será redirecionado.');
+  window.location.href = '/pedido/' + orderId;
+}
+
+let pollTimer = null;
+function startPolling() {
+  pollTimer = setInterval(async () => {
+    try {
+      const r = await fetch('/api/pagamento/status/' + orderId);
+      const d = await r.json();
+      if (d.status === 'pago') {
+        clearInterval(pollTimer);
+        window.location.href = '/pedido/' + orderId;
+      }
+    } catch(e) {}
+  }, 5000);
+}
+
+renderPaymentBrick();
+</script>
+
+<style>
+.pay-grid{display:grid;grid-template-columns:1fr 340px;gap:32px;margin-top:20px}
+@media (max-width:900px){.pay-grid{grid-template-columns:1fr}}
+.pay-main{min-height:400px}
+.pay-loading{padding:40px;text-align:center;color:var(--muted)}
+.pay-summary{background:#fff;border:1px solid var(--line);border-radius:14px;padding:22px;height:fit-content;position:sticky;top:120px}
+.pay-summary .ck-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px dashed var(--line);gap:12px}
+.pay-summary .ck-info{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0}
+.pay-summary .ck-info span{font-size:14px;color:var(--ink)}
+.pay-summary .ck-info small{color:var(--muted);font-size:12px}
+.pay-summary hr{border:none;border-top:1px solid var(--line);margin:12px 0}
+.pay-summary .row{display:flex;justify-content:space-between;padding:4px 0;font-size:14px}
+.pay-summary .row.total{font-size:16px;font-weight:600;color:var(--ink);border-top:1px solid var(--line);padding-top:10px;margin-top:6px}
+.pix-result,.boleto-result{background:#fff;border:1px solid var(--line);border-radius:14px;padding:26px;text-align:center}
+.pix-result h2,.boleto-result h2{margin-top:0;color:var(--ink)}
+.pix-qr-wrap{margin:20px auto;display:inline-block;padding:12px;background:#fff;border:2px solid var(--line);border-radius:12px}
+.pix-result textarea{width:100%;padding:10px;font-family:monospace;font-size:12px;border:1px solid var(--line);border-radius:8px;resize:none;margin:12px 0}
+</style>
+
+<%- include('partials/footer') %>
