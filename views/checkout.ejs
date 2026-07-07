@@ -37,37 +37,17 @@
       </fieldset>
       <fieldset>
         <legend>Pagamento</legend>
-        <div class="pay-options">
-          <label><input type="radio" name="payment" value="pix" checked> Pix (5% off na confirmação)</label>
-          <label><input type="radio" name="payment" value="cartao"> Cartão de crédito (até 3x)</label>
-          <label><input type="radio" name="payment" value="boleto"> Boleto bancário</label>
-        </div>
-
-        <div id="cardFields" class="card-fields" hidden>
-          <div class="row-2">
-            <label>Número do cartão
-              <input name="card_number" id="card_number" inputmode="numeric" maxlength="23" autocomplete="cc-number" placeholder="0000 0000 0000 0000">
-              <small class="muted" id="cardBrand"></small>
-            </label>
-            <label>Nome impresso
-              <input name="card_holder" id="card_holder" autocomplete="cc-name" placeholder="Como está no cartão">
-            </label>
-          </div>
-          <div class="row-3">
-            <label>Validade
-              <input name="card_expiry" id="card_expiry" inputmode="numeric" maxlength="5" autocomplete="cc-exp" placeholder="MM/AA">
-            </label>
-            <label>CVV
-              <input name="card_cvv" id="card_cvv" inputmode="numeric" maxlength="4" autocomplete="cc-csc" placeholder="000">
-            </label>
-            <label>Parcelas
-              <select name="installments" id="installments">
-                <option value="1">1x à vista</option>
-                <option value="2">2x sem juros</option>
-                <option value="3">3x sem juros</option>
-              </select>
-            </label>
-          </div>
+        <div class="mp-info">
+          <img src="https://http2.mlstatic.com/frontend-assets/mp-web-navigation/ui-navigation/6.5.5/mercadopago/logo__large@2x.png" alt="Mercado Pago" style="height:36px;margin-bottom:12px">
+          <p><strong>Pagamento seguro via Mercado Pago</strong></p>
+          <p class="muted small">Ao clicar em <em>Confirmar pedido</em> você será direcionado à tela oficial do Mercado Pago onde poderá pagar com:</p>
+          <ul class="mp-methods">
+            <li>💳 <strong>Cartão de crédito</strong> (até 3x sem juros)</li>
+            <li>💳 <strong>Cartão de débito</strong></li>
+            <li>⚡ <strong>PIX</strong> (aprovação em segundos)</li>
+            <li>📄 <strong>Boleto bancário</strong></li>
+          </ul>
+          <p class="muted small">Após o pagamento você volta ao site com a confirmação do pedido.</p>
         </div>
       </fieldset>
     </div>
@@ -182,82 +162,14 @@ document.getElementById('btnFrete').addEventListener('click', () => {
 // UF sempre maiúsculo
 stateInput.addEventListener('input', () => { stateInput.value = stateInput.value.toUpperCase().replace(/[^A-Z]/g,''); });
 
-// ===== Pagamento: campos de cartão =====
-const cardFields = document.getElementById('cardFields');
-const cardNum    = document.getElementById('card_number');
-const cardExp    = document.getElementById('card_expiry');
-const cardCvv    = document.getElementById('card_cvv');
-const cardBrand  = document.getElementById('cardBrand');
-const instSel    = document.getElementById('installments');
-const payRadios  = document.querySelectorAll('input[name="payment"]');
-
-function togglePayment() {
-  const v = document.querySelector('input[name="payment"]:checked').value;
-  const isCard = v === 'cartao';
-  cardFields.hidden = !isCard;
-  // required dinâmico
-  ['card_number','card_holder','card_expiry','card_cvv'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.required = isCard;
-  });
-}
-payRadios.forEach(r => r.addEventListener('change', togglePayment));
-togglePayment();
-
-// Máscara do número (xxxx xxxx xxxx xxxx) + bandeira
-function brand(num){
-  const s = (num||'').replace(/\D/g,'');
-  if (/^4/.test(s)) return 'Visa';
-  if (/^(5[1-5]|2[2-7])/.test(s)) return 'Mastercard';
-  if (/^3[47]/.test(s)) return 'Amex';
-  if (/^(4011|4312|4389|4514|4573|5041|5066|5067|509|627780|636297|6504|6505|6516|6550)/.test(s)) return 'Elo';
-  if (/^(606282|3841)/.test(s)) return 'Hipercard';
-  if (/^6(?:011|5)/.test(s)) return 'Discover';
-  return '';
-}
-cardNum.addEventListener('input', () => {
-  let d = cardNum.value.replace(/\D/g,'').slice(0,19);
-  cardNum.value = d.replace(/(.{4})/g,'$1 ').trim();
-  const b = brand(d);
-  cardBrand.textContent = b ? ('Bandeira: ' + b) : '';
-});
-
-// Validade MM/AA
-cardExp.addEventListener('input', () => {
-  let d = cardExp.value.replace(/\D/g,'').slice(0,4);
-  cardExp.value = d.length > 2 ? d.slice(0,2) + '/' + d.slice(2) : d;
-});
-
-// CVV só números
-cardCvv.addEventListener('input', () => { cardCvv.value = cardCvv.value.replace(/\D/g,'').slice(0,4); });
-
-// Luhn no submit
-function luhn(num){
-  const s = (num||'').replace(/\D/g,'');
-  if (s.length < 13) return false;
-  let sum=0, alt=false;
-  for (let i=s.length-1;i>=0;i--){
-    let n = parseInt(s[i],10);
-    if (alt){ n*=2; if (n>9) n-=9; }
-    sum+=n; alt=!alt;
-  }
-  return sum % 10 === 0;
-}
-document.getElementById('checkoutForm').addEventListener('submit', (e) => {
-  // Monta o endereço completo no hidden field
+// Ao submeter, monta o endereço completo no hidden field
+document.getElementById('checkoutForm').addEventListener('submit', () => {
   const parts = [];
   if (streetInput.value.trim()) parts.push(streetInput.value.trim());
   if (numberInput.value.trim()) parts.push('nº ' + numberInput.value.trim());
   if (compInput.value.trim())   parts.push(compInput.value.trim());
   if (neighInput.value.trim())  parts.push(neighInput.value.trim());
   addrInput.value = parts.join(', ');
-
-  const pay = document.querySelector('input[name="payment"]:checked').value;
-  if (pay === 'cartao' && !luhn(cardNum.value)) {
-    e.preventDefault();
-    alert('Número do cartão inválido. Verifique os dígitos.');
-    cardNum.focus();
-  }
 });
 </script>
 

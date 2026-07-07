@@ -186,6 +186,11 @@ h3{font-size:22px;margin:18px 0 10px}
 .frete-info strong{color:var(--ink);font-size:15px}
 .frete-info small{color:var(--muted);font-size:12px}
 .frete-price{color:var(--ink);font-weight:600}
+.mp-info{padding:20px;background:#f7f9fc;border:1px solid var(--line);border-radius:12px}
+.mp-info p{margin:6px 0}
+.mp-methods{list-style:none;padding:0;margin:12px 0;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.mp-methods li{padding:10px 12px;background:#fff;border:1px solid var(--line);border-radius:8px;font-size:14px;color:var(--ink-2)}
+@media (max-width:640px){.mp-methods{grid-template-columns:1fr}}
 .pay-options{display:flex;flex-direction:column;gap:10px}
 .pay-options label{flex-direction:row;align-items:center;gap:10px;color:var(--ink-2);font-size:15px;padding:12px;border:1px solid var(--line);border-radius:10px;cursor:pointer;margin:0}
 .pay-options label:has(input:checked){border-color:var(--rose-400);background:var(--rose-50)}

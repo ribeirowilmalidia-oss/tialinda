@@ -7,6 +7,7 @@ const pool = require('./db');
 const payments = require('./lib/payments');
 const mailer = require('./lib/mailer');
 const correios = require('./lib/correios');
+const mp = require('./lib/mercadopago');
 
 // Chave PIX e dados do recebedor (Mercado Pago - Wilma Lidia Ribeiro)
 const PIX_KEY     = process.env.PIX_KEY     || 'ee9e688b-ee8f-4c7d-86e9-7abc7d971cc6';
@@ -64,8 +65,13 @@ async function migrate() {
     payment VARCHAR(20),
     status VARCHAR(30) NOT NULL DEFAULT 'pendente',
     tracking_code VARCHAR(40),
+    mp_preference_id VARCHAR(80),
+    mp_payment_id VARCHAR(80),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )`);
+  // ALTER tolerante caso a tabela já exista (idempotente)
+  try { await pool.execute("ALTER TABLE orders ADD COLUMN mp_preference_id VARCHAR(80)"); } catch(e) {}
+  try { await pool.execute("ALTER TABLE orders ADD COLUMN mp_payment_id VARCHAR(80)"); } catch(e) {}
   await pool.execute(`CREATE TABLE IF NOT EXISTS order_items (
     id INT AUTO_INCREMENT PRIMARY KEY,
     order_id INT NOT NULL,
@@ -302,58 +308,112 @@ app.post('/checkout/finalizar', async (req, res) => {
   const total = detail.subtotal + shipping;
   const tracking = genTrack();
 
-  // Validação de cartão (quando aplicável)
-  let cardInfo = null;
-  if (payment === 'cartao') {
-    const num = (req.body.card_number || '').replace(/\D/g, '');
-    const holder = (req.body.card_holder || '').trim();
-    const exp = (req.body.card_expiry || '').trim();
-    const cvv = (req.body.card_cvv || '').replace(/\D/g, '');
-    if (!payments.luhn(num)) return res.status(400).send('Número do cartão inválido.');
-    if (!holder)             return res.status(400).send('Informe o nome impresso no cartão.');
-    if (!/^\d{2}\/\d{2}$/.test(exp)) return res.status(400).send('Validade no formato MM/AA.');
-    if (cvv.length < 3)      return res.status(400).send('CVV inválido.');
-    cardInfo = {
-      brand: payments.detectBrand(num),
-      last4: payments.cardLast4(num),
-      holder,
-      expiry: exp,
-      installments: Math.max(1, Math.min(3, parseInt(req.body.installments || '1', 10)))
-    };
-  }
-
   const conn = await pool.getConnection();
+  let orderId;
   try {
     await conn.beginTransaction();
     const [r] = await conn.execute(
       'INSERT INTO orders (customer_name,email,phone,cep,address,city,state,subtotal,shipping,total,payment,status,tracking_code) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
-      [name, email, phone, cep, address, city, state, detail.subtotal, shipping, total, payment, 'pendente', tracking]
+      [name, email, phone, cep, address, city, state, detail.subtotal, shipping, total, 'mercadopago', 'aguardando_pagamento', tracking]
     );
-    const orderId = r.insertId;
+    orderId = r.insertId;
     for (const it of detail.items) {
       await conn.execute('INSERT INTO order_items (order_id, product_id, name, price, qty) VALUES (?,?,?,?,?)',
         [orderId, it.id, it.name, it.price, it.qty]);
+      // reserva stock preventivamente
       await conn.execute('UPDATE products SET stock = GREATEST(stock - ?, 0) WHERE id=?', [it.qty, it.id]);
     }
     await conn.commit();
-    res.cookie('cart', '[]', { maxAge: 0 });
-    // Dispara e-mails de confirmação (cliente + admin) sem bloquear resposta.
-    mailer.sendOrderConfirmation(
-      { id: orderId, customer_name: name, email, phone, cep, address, city, state,
-        subtotal: detail.subtotal, shipping, total, payment, tracking_code: tracking },
-      detail.items
-    ).catch(err => console.error('[mailer] falha ao enviar pedido #' + orderId + ':', err.message));
-    if (cardInfo) {
-      res.cookie('last_card', JSON.stringify({ ...cardInfo, orderId }), {
-        httpOnly: false, sameSite: 'lax', maxAge: 30 * 60 * 1000, path: '/'
-      });
-    }
-    cookieRedirect(res, '/pedido/' + orderId + '?t=' + tracking, 'Finalizando pedido');
   } catch (e) {
     await conn.rollback();
-    res.status(500).send('Erro ao processar pedido: ' + e.message);
+    conn.release();
+    return res.status(500).send('Erro ao processar pedido: ' + e.message);
   } finally {
     conn.release();
+  }
+
+  res.cookie('cart', '[]', { maxAge: 0 });
+
+  // Cria preferência no Mercado Pago
+  const pref = await mp.createPreference(
+    { id: orderId, customer_name: name, email, phone, cep, address, city, state,
+      subtotal: detail.subtotal, shipping, total },
+    detail.items
+  );
+
+  if (pref.error) {
+    console.error('[checkout] MP falhou pedido #' + orderId + ':', pref.error);
+    // Cai pra tela de pedido com aviso
+    return cookieRedirect(res, '/pedido/' + orderId + '?erro=pagamento', 'Redirecionando');
+  }
+
+  // Guarda preference_id no pedido (opcional; ignora erro)
+  pool.execute('UPDATE orders SET mp_preference_id=? WHERE id=?', [pref.id, orderId])
+    .catch(() => {});
+
+  // Redireciona pro checkout do Mercado Pago
+  cookieRedirect(res, pref.init_point, 'Redirecionando ao Mercado Pago');
+});
+
+// Cliente retorna do Mercado Pago (success / pending / failure)
+app.get('/pedido/:id/retorno', async (req, res) => {
+  const orderId = parseInt(req.params.id, 10);
+  const paymentId = req.query.payment_id || req.query.collection_id;
+  const mpStatus  = req.query.status || req.query.collection_status;
+
+  const [[o]] = await pool.execute('SELECT * FROM orders WHERE id=?', [orderId]);
+  if (!o) return res.status(404).render('404');
+
+  // Se veio payment_id, consulta o MP pra confirmar o status real
+  if (paymentId) {
+    const p = await mp.getPayment(paymentId);
+    if (p && p.status) {
+      const newStatus = mp.mapStatus(p.status);
+      await pool.execute('UPDATE orders SET status=?, mp_payment_id=? WHERE id=?',
+        [newStatus, String(paymentId), orderId]).catch(() => {});
+      // Dispara e-mails só quando aprovado (evita spam em pending)
+      if (newStatus === 'pago' && o.status !== 'pago') {
+        const [items] = await pool.execute('SELECT * FROM order_items WHERE order_id=?', [orderId]);
+        mailer.sendOrderConfirmation({ ...o, status: 'pago' }, items)
+          .catch(err => console.error('[mailer]', err.message));
+      }
+    }
+  }
+
+  res.redirect('/pedido/' + orderId + '?mp=' + (mpStatus || 'return'));
+});
+
+// Webhook do Mercado Pago (chamado automaticamente pelo MP quando pagamento muda de status)
+app.post('/webhook/mercadopago', async (req, res) => {
+  res.status(200).send('ok'); // responde rápido, MP dá timeout em 22s
+
+  try {
+    const type = req.body.type || req.query.type;
+    const dataId = (req.body.data && req.body.data.id) || req.query['data.id'];
+    if (type !== 'payment' || !dataId) return;
+
+    const p = await mp.getPayment(dataId);
+    if (!p) return;
+
+    const orderId = parseInt(p.external_reference, 10);
+    if (!orderId) return;
+
+    const [[o]] = await pool.execute('SELECT * FROM orders WHERE id=?', [orderId]);
+    if (!o) return;
+
+    const newStatus = mp.mapStatus(p.status);
+    await pool.execute('UPDATE orders SET status=?, mp_payment_id=? WHERE id=?',
+      [newStatus, String(dataId), orderId]);
+
+    console.log('[webhook] pedido #' + orderId + ' → ' + newStatus + ' (mp status: ' + p.status + ')');
+
+    if (newStatus === 'pago' && o.status !== 'pago') {
+      const [items] = await pool.execute('SELECT * FROM order_items WHERE order_id=?', [orderId]);
+      mailer.sendOrderConfirmation({ ...o, status: 'pago' }, items)
+        .catch(err => console.error('[mailer]', err.message));
+    }
+  } catch (e) {
+    console.error('[webhook] erro:', e.message);
   }
 });
 

@@ -40,7 +40,17 @@
     <p><%= o.address %><br><%= o.city %>/<%= o.state %> · CEP <%= o.cep %></p>
 
     <h3>Pagamento</h3>
-    <p><%= o.payment === 'pix' ? 'Pix' : o.payment === 'cartao' ? 'Cartão de crédito' : 'Boleto bancário' %></p>
+    <p>
+      <% if (o.payment === 'mercadopago') { %>
+        Via Mercado Pago
+        <% if (o.status === 'pago') { %>· <strong style="color:#25a45a">✓ Aprovado</strong>
+        <% } else if (o.status === 'aguardando_pagamento') { %>· <strong style="color:#c78a2b">⏳ Aguardando pagamento</strong>
+        <% } else if (o.status === 'recusado' || o.status === 'cancelado') { %>· <strong style="color:#c4392b">✗ <%= o.status === 'recusado' ? 'Recusado' : 'Cancelado' %></strong>
+        <% } %>
+      <% } else { %>
+        <%= o.payment === 'pix' ? 'Pix' : o.payment === 'cartao' ? 'Cartão de crédito' : 'Boleto bancário' %>
+      <% } %>
+    </p>
 
     <% if (o.payment === 'pix' && pay.pix) { %>
       <div class="pay-panel pay-pix">
