@@ -772,6 +772,62 @@ app.post('/admin/pedido/:id/status', adminAuth, async (req, res) => {
   res.redirect('/admin/pedido/' + req.params.id);
 });
 
+// Tela visual de importação em massa — cole JSON e clique importar
+app.get('/admin/importar', adminAuth, (req, res) => {
+  res.render('admin/importar', { result: null, jsonInput: '' });
+});
+
+app.post('/admin/importar-form', adminAuth, async (req, res) => {
+  const jsonText = String(req.body.produtos_json || '').trim();
+  let items = [];
+  let parseError = null;
+  try {
+    items = JSON.parse(jsonText);
+    if (!Array.isArray(items)) items = [items];
+  } catch (e) {
+    parseError = 'JSON inválido: ' + e.message;
+  }
+  if (parseError) {
+    return res.render('admin/importar', { result: { error: parseError }, jsonInput: jsonText });
+  }
+  let inserted = 0, skipped = 0, errors = 0;
+  const details = [];
+  const slugify = s => String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,200);
+  for (const p of items) {
+    try {
+      const baseSlug = slugify(p.name || p.slug || 'produto');
+      const slug = p.old_id ? `${baseSlug}-${p.old_id}` : baseSlug;
+      const [existing] = await pool.execute('SELECT id FROM products WHERE slug=?', [slug]);
+      if (existing && existing.length) { skipped++; details.push({name: p.name, status: 'pulado (já existe)'}); continue; }
+      const rawUsd = p.price_usd != null ? parseFloat(String(p.price_usd).replace(',','.')) : null;
+      const price_usd = rawUsd && rawUsd > 0 ? rawUsd : null;
+      await pool.execute(
+        'INSERT INTO products (name, slug, category, description, price, price_usd, stock, image_url, featured) VALUES (?,?,?,?,?,?,?,?,?)',
+        [
+          String(p.name||'').slice(0,200),
+          slug,
+          String(p.category||'cama').slice(0,40),
+          String(p.description||'').slice(0,2000),
+          Number(p.price)||0,
+          price_usd,
+          parseInt(p.stock,10)||0,
+          String(p.image_url||'').slice(0,500),
+          p.featured ? 1 : 0
+        ]
+      );
+      inserted++;
+      details.push({name: p.name, status: 'inserido'});
+    } catch (e) {
+      errors++;
+      details.push({name: p.name, status: 'erro: ' + e.message});
+    }
+  }
+  res.render('admin/importar', {
+    result: { total: items.length, inserted, skipped, errors, details },
+    jsonInput: ''
+  });
+});
+
 // Importação em lote de produtos (JSON). Idempotente: pula slugs já existentes.
 app.post('/admin/importar', adminAuth, express.json({ limit: '4mb' }), async (req, res) => {
   const items = Array.isArray(req.body) ? req.body : (req.body.items || []);

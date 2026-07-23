@@ -1,0 +1,78 @@
+<% const title='Importar produtos'; %><%- include('_head') %>
+
+<header class="admin-header">
+  <div>
+    <h1>Importar produtos em massa</h1>
+    <p class="muted">Cole um JSON com a lista de produtos. Cadastros duplicados (mesmo nome) são ignorados automaticamente.</p>
+  </div>
+  <a href="/admin/produtos" class="btn btn-ghost btn-sm">← Voltar</a>
+</header>
+
+<% if (result && result.error) { %>
+  <div class="card" style="background:#fdecea;border-color:#f5c6c1;color:#a3352c;margin-bottom:20px">
+    <strong>❌ Erro:</strong> <%= result.error %>
+  </div>
+<% } else if (result) { %>
+  <div class="card" style="background:#eaf7ed;border-color:#c1e5cf;color:#215c34;margin-bottom:20px">
+    <h2 style="margin-top:0">✓ Importação concluída</h2>
+    <div style="display:flex;gap:24px;flex-wrap:wrap;margin:10px 0">
+      <div><strong style="font-size:22px"><%= result.total %></strong><br><small>Total enviado</small></div>
+      <div style="color:#25a45a"><strong style="font-size:22px"><%= result.inserted %></strong><br><small>Inseridos</small></div>
+      <div style="color:#c78a2b"><strong style="font-size:22px"><%= result.skipped %></strong><br><small>Pulados (duplicados)</small></div>
+      <div style="color:#c4392b"><strong style="font-size:22px"><%= result.errors %></strong><br><small>Com erro</small></div>
+    </div>
+    <% if (result.details && result.details.length) { %>
+      <details style="margin-top:14px">
+        <summary style="cursor:pointer;font-weight:600">Ver detalhes de cada produto</summary>
+        <table class="t" style="margin-top:10px;font-size:13px">
+          <% result.details.forEach(d => { %>
+            <tr>
+              <td><%= d.name %></td>
+              <td><strong style="color:<%= d.status.startsWith('inserido') ? '#25a45a' : d.status.startsWith('pulado') ? '#c78a2b' : '#c4392b' %>"><%= d.status %></strong></td>
+            </tr>
+          <% }) %>
+        </table>
+      </details>
+    <% } %>
+    <div style="margin-top:14px">
+      <a href="/admin/produtos" class="btn btn-primary btn-sm">Ver produtos</a>
+      <a href="/admin/importar" class="btn btn-soft btn-sm">Importar mais</a>
+    </div>
+  </div>
+<% } %>
+
+<div class="card">
+  <div class="card-head"><h2>Cole o JSON</h2></div>
+  <form method="POST" action="/admin/importar-form">
+    <p class="muted" style="font-size:13px">Formato esperado: array de objetos com <code>name, category, price, price_usd, stock, image_url, description, featured</code>.</p>
+    <textarea name="produtos_json" rows="20" style="width:100%;font-family:monospace;font-size:13px;padding:12px;border:1px solid #ddd;border-radius:8px;box-sizing:border-box" placeholder='[
+  {
+    "name": "Nome do produto",
+    "category": "cama",
+    "price": 200.00,
+    "price_usd": 38.00,
+    "stock": 5,
+    "image_url": "https://...",
+    "description": "Descrição do produto",
+    "featured": 1
+  }
+]' required><%= jsonInput || '' %></textarea>
+    <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap">
+      <button type="submit" class="btn btn-primary">📥 Importar produtos</button>
+      <button type="button" class="btn btn-soft" onclick="document.querySelector('[name=produtos_json]').value=''">Limpar</button>
+    </div>
+  </form>
+</div>
+
+<div class="card" style="margin-top:20px">
+  <div class="card-head"><h3>Ajuda</h3></div>
+  <ul style="line-height:1.8;padding-left:22px;font-size:14px">
+    <li><strong>Categorias válidas:</strong> <code>cama</code>, <code>mesa</code>, <code>banho</code>, <code>perfumaria</code>, <code>cosmeticos</code></li>
+    <li><strong>Duplicados:</strong> produtos com nome idêntico a algum já cadastrado são <em>pulados</em> automaticamente</li>
+    <li><strong>Preço em dólar:</strong> se preencher <code>price_usd</code>, o preço em R$ é atualizado diariamente pela cotação</li>
+    <li><strong>Featured:</strong> use <code>1</code> para destacar na home, <code>0</code> caso contrário</li>
+    <li><strong>Imagem:</strong> URL direta (.jpg, .png, .webp). Deixe em branco se ainda não tem</li>
+  </ul>
+</div>
+
+<%- include('_foot') %>

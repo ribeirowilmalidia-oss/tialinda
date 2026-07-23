@@ -1,0 +1,202 @@
+[
+  {
+    "name": "Cobertor/Edredom Casa Eterna Kit 3 Peças Queen",
+    "category": "cama",
+    "price": 400.00,
+    "price_usd": 17.90,
+    "stock": 1,
+    "featured": 1,
+    "image_url": "https://images.unsplash.com/photo-1631049552240-59c37f38802b?w=800",
+    "description": "Kit edredom Casa Eterna com 3 peças, tamanho Queen. Composição luxuosa e acabamento premium. Peça única disponível."
+  },
+  {
+    "name": "Cobertor/Edredom Casa Eterna Kit 7 Peças 5200 Fios",
+    "category": "cama",
+    "price": 580.00,
+    "price_usd": 52.76,
+    "stock": 1,
+    "featured": 1,
+    "image_url": "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800",
+    "description": "Edredom Casa Eterna kit completo de 7 peças em 5200 fios. Máximo conforto e sofisticação. Peça única disponível."
+  },
+  {
+    "name": "Manta Pele de Coelho Queen",
+    "category": "cama",
+    "price": 94.00,
+    "price_usd": 17.90,
+    "stock": 8,
+    "featured": 0,
+    "image_url": "https://images.unsplash.com/photo-1616627451515-0d4c11a17e8f?w=800",
+    "description": "Manta pele de coelho macia e aconchegante, tamanho Queen. Cores disponíveis: Azul (1), Marrom (2), Bege (3), Rosa (2)."
+  },
+  {
+    "name": "Roupão Felpudo Bege — Tamanho Único",
+    "category": "banho",
+    "price": 215.00,
+    "price_usd": 40.95,
+    "stock": 3,
+    "featured": 1,
+    "image_url": "https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?w=800",
+    "description": "Roupão felpudo cor bege, altíssima absorção. Tamanhos disponíveis: M, G e GG (1 peça cada)."
+  },
+  {
+    "name": "Jogo de Lençol Matador Torero 4 Peças 3000 Fios Queen (160x200x40)",
+    "category": "cama",
+    "price": 200.00,
+    "price_usd": 38.19,
+    "stock": 8,
+    "featured": 1,
+    "image_url": "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?w=800",
+    "description": "Jogo de lençol Matador Torero, 4 peças, 3000 fios, tamanho Queen (160x200x40cm). Cores: Azul Claro, Azul Royal, Rosa, Bege Rosado, Branca, Bege, Vinho e Branco."
+  },
+  {
+    "name": "Jogo de Lençol Bouquetex 4 Peças 3200 Fios Queen (160x200x40)",
+    "category": "cama",
+    "price": 185.00,
+    "price_usd": 35.23,
+    "stock": 7,
+    "featured": 1,
+    "image_url": "https://images.unsplash.com/photo-1631049307264-da0ec9d70304?w=800",
+    "description": "Jogo de lençol Bouquetex, 4 peças, 3200 fios, tamanho Queen (160x200x40cm). Cores: Gelo, Azul Royal (2), Marrom Claro, Bege, Areia e Verde."
+  },
+  {
+    "name": "Jogo de Lençol Casatex Bordado 6 Peças 4500 Fios Casal (200x230)",
+    "category": "cama",
+    "price": 277.00,
+    "price_usd": 52.76,
+    "stock": 7,
+    "featured": 1,
+    "image_url": "https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800",
+    "description": "Jogo Casatex bordado 6 peças (elástico, cobre-leito, 2 fronhas, 2 almofadas) 200x230cm / 137x191x38. 4500 fios, 100% algodão. Cores: Verde Claro, Verde Escuro, Rosa, Lilás, Bege e Branco (2)."
+  },
+  {
+    "name": "Jogo de Lençol Bouquetex 4 Peças 4500 Fios Queen (160x200x40)",
+    "category": "cama",
+    "price": 299.00,
+    "price_usd": 56.95,
+    "stock": 1,
+    "featured": 0,
+    "image_url": "https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=800",
+    "description": "Jogo Bouquetex de altíssima qualidade, 4 peças, 4500 fios, tamanho Queen (160x200x40cm). Cor: Azul. Peça única."
+  },
+  {
+    "name": "Jogo de Lençol Bouquetex 4 Peças 4500 Fios King (270x230x40)",
+    "category": "cama",
+    "price": 299.00,
+    "price_usd": 56.95,
+    "stock": 1,
+    "featured": 0,
+    "image_url": "https://images.unsplash.com/photo-1585687501004-615dedcfa78d?w=800",
+    "description": "Jogo Bouquetex 4 peças, 4500 fios, tamanho King (270x230x40cm). Cor: Verde Claro. Peça única."
+  },
+  {
+    "name": "Jogo de Lençol Goldsun 4 Peças 4800 Fios Casal (140x200x40)",
+    "category": "cama",
+    "price": 200.00,
+    "price_usd": 38.17,
+    "stock": 3,
+    "featured": 0,
+    "image_url": "https://images.unsplash.com/photo-1616627451515-0d4c11a17e8f?w=800",
+    "description": "Jogo Goldsun 4 peças, 4800 fios, tamanho Casal (140x200x40cm). Cores: Bege Escuro (2) e Rosa (1)."
+  },
+  {
+    "name": "Jogo de Lençol Goldsun 3 Peças 4800 Fios Solteiro (105x203x40)",
+    "category": "cama",
+    "price": 155.00,
+    "price_usd": 29.52,
+    "stock": 3,
+    "featured": 0,
+    "image_url": "https://images.unsplash.com/photo-1580721935316-6a4d6942ff36?w=800",
+    "description": "Jogo Goldsun 3 peças, 4800 fios, tamanho Solteiro (105x203x40cm). Cores: Bege Escuro, Bege Claro e Marrom."
+  },
+  {
+    "name": "Jogo de Lençol Matador Torero 4 Peças 3000 Fios Casal (140x200x40)",
+    "category": "cama",
+    "price": 185.00,
+    "price_usd": 35.24,
+    "stock": 7,
+    "featured": 0,
+    "image_url": "https://images.unsplash.com/photo-1631049035182-249067d7618e?w=800",
+    "description": "Jogo Matador Torero 4 peças, 3000 fios, tamanho Casal (140x200x40cm). Cores: Verde, Areia (2), Branco (2) e Azul Claro (2)."
+  },
+  {
+    "name": "Jogo de Lençol Casatex Bordado 4 Peças 3000 Fios Casal (140x200x40)",
+    "category": "cama",
+    "price": 290.00,
+    "price_usd": 55.23,
+    "stock": 1,
+    "featured": 0,
+    "image_url": "https://images.unsplash.com/photo-1594040226829-7f251ab46d80?w=800",
+    "description": "Jogo Casatex bordado 4 peças (elástico, cobre-leito, 2 fronhas) 140x200x40cm. 3000 fios, 100% algodão. Cor: Azul. Peça única."
+  },
+  {
+    "name": "Jogo de Lençol Bouquetex 4 Peças 3200 Fios Casal (140x200x40)",
+    "category": "cama",
+    "price": 160.00,
+    "price_usd": 30.47,
+    "stock": 2,
+    "featured": 0,
+    "image_url": "https://images.unsplash.com/photo-1631049307264-da0ec9d70304?w=800",
+    "description": "Jogo Bouquetex 4 peças, 3200 fios, tamanho Casal (140x200x40cm). Cores: Bege e Verde."
+  },
+  {
+    "name": "Jogo de Lençol Bouquetex 4 Peças 3200 Fios Solteiro (105x203x40)",
+    "category": "cama",
+    "price": 145.00,
+    "price_usd": 27.61,
+    "stock": 1,
+    "featured": 0,
+    "image_url": "https://images.unsplash.com/photo-1580721935316-6a4d6942ff36?w=800",
+    "description": "Jogo Bouquetex 4 peças, 3200 fios, tamanho Solteiro (105x203x40cm). Cor: Bege. Peça única."
+  },
+  {
+    "name": "Jogo de Lençol Bouquetex 4 Peças 3200 Fios King (270x230x40)",
+    "category": "cama",
+    "price": 282.00,
+    "price_usd": 53.71,
+    "stock": 2,
+    "featured": 0,
+    "image_url": "https://images.unsplash.com/photo-1585687501004-615dedcfa78d?w=800",
+    "description": "Jogo Bouquetex 4 peças, 3200 fios, tamanho King (270x230x40cm). Cores: Rosa e Azul Royal."
+  },
+  {
+    "name": "Toalha de Banho Seca Rápido Goldsun America TP-5Q (90x160)",
+    "category": "banho",
+    "price": 80.00,
+    "price_usd": 15.24,
+    "stock": 9,
+    "featured": 1,
+    "image_url": "https://images.unsplash.com/photo-1600369671236-e74521d4b6ad?w=800",
+    "description": "Toalha de banho Goldsun America TP-5Q, tecnologia de secagem rápida, 90x160cm. Cores: Cinza (2), Marrom (2), Azul, Lilás, Verde e Rosa (2)."
+  },
+  {
+    "name": "Toalha de Banho Seca Rápido Goldsun America TP-7Q (90x160)",
+    "category": "banho",
+    "price": 80.00,
+    "price_usd": 15.24,
+    "stock": 4,
+    "featured": 0,
+    "image_url": "https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=800",
+    "description": "Toalha de banho Goldsun America TP-7Q, secagem rápida, 90x160cm. Cores: Rosa (2) e Marrom (2)."
+  },
+  {
+    "name": "Kit Toalha Goldsun America 3 Peças (90x160 / 70x140 / 46x76)",
+    "category": "banho",
+    "price": 110.00,
+    "price_usd": 21.00,
+    "stock": 4,
+    "featured": 1,
+    "image_url": "https://images.unsplash.com/photo-1564540583246-934409427776?w=800",
+    "description": "Kit com toalha de banho (90x160), toalha de rosto (70x140) e toalha de mão (46x76). Cores: Creme, Bege (2) e Rosa."
+  },
+  {
+    "name": "Cobertor Felpudo Queen",
+    "category": "cama",
+    "price": 160.00,
+    "price_usd": 30.47,
+    "stock": 3,
+    "featured": 0,
+    "image_url": "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800",
+    "description": "Cobertor felpudo super macio, tamanho Queen. Cores: Cinza (1) e Bege (2)."
+  }
+]
