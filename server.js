@@ -784,6 +784,7 @@ app.post('/admin/atualizar-usd', adminAuth, express.json({ limit: '2mb' }), asyn
       if (it.price_usd !== undefined) { sets.push('price_usd=?'); vals.push(it.price_usd); }
       if (it.size !== undefined) { sets.push('size=?'); vals.push(it.size ? String(it.size).toUpperCase() : null); }
       if (it.stock !== undefined) { sets.push('stock=?'); vals.push(parseInt(it.stock, 10) || 0); }
+      if (it.image_url !== undefined) { sets.push('image_url=?'); vals.push(String(it.image_url||'').slice(0,500)); }
       if (!sets.length) continue;
       vals.push(it.slug);
       const [r] = await pool.execute(
