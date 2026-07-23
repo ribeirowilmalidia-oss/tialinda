@@ -9,7 +9,18 @@
   <div class="kpi">
     <small>Cotação USD/BRL agora</small>
     <strong><%= cotacao ? 'R$ ' + Number(cotacao).toFixed(4).replace('.', ',') : '—' %></strong>
-    <p class="muted" style="margin:6px 0 0;font-size:12px">Fonte: <%= fonte || '(cache)' %></p>
+    <p class="muted" style="margin:6px 0 0;font-size:12px">
+      Fonte:
+      <% if (fonte === 'dolarpy') { %>
+        <a href="https://www.dolarpy.com.br/" target="_blank" rel="noopener">dolarpy.com.br</a> (fronteira PY/BR)
+      <% } else if (fonte === 'awesomeapi') { %>
+        awesomeapi (comercial)
+      <% } else if (fonte && fonte.startsWith('bcb')) { %>
+        Banco Central (PTAX)
+      <% } else { %>
+        <%= fonte || '(cache)' %>
+      <% } %>
+    </p>
   </div>
   <div class="kpi <%= ativo ? 'kpi-accent' : '' %>">
     <small>Fator aplicado</small>
@@ -77,7 +88,7 @@
     <ol style="line-height:1.7;padding:0 4px 4px 22px;font-size:14px">
       <li>Cadastre os produtos com preços em BRL normalmente.</li>
       <li>Defina a <strong>cotação de referência</strong> = valor do dólar no dia dos preços atuais.</li>
-      <li>Diariamente o site busca a cotação USD/BRL via <strong>awesomeapi.com.br</strong> (com fallback no <strong>Banco Central</strong>).</li>
+      <li>Diariamente o site busca a cotação USD/BRL em <strong><a href="https://www.dolarpy.com.br/" target="_blank">dolarpy.com.br</a></strong> (dólar da fronteira PY/BR — o valor real de câmbio na fronteira). Fallbacks automáticos: awesomeapi e Banco Central.</li>
       <li>O fator = cotação_hoje ÷ cotação_referência × (1 + markup).</li>
       <li>Se dólar subir de R$ 5,50 → R$ 5,72, fator = 1,04 → toalha de R$ 89,90 vai para R$ 93,50.</li>
       <li>A cotação fica em cache por 6h para não sobrecarregar a API.</li>
