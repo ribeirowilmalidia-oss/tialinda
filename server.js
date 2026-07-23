@@ -31,7 +31,6 @@ const SHIPPING_FREE_THRESHOLD = 199;
 // ---------- Categories ----------
 const CATEGORIES = [
   { slug: 'cama',        name: 'Cama',        icon: 'M3 10h18v8H3z M5 10V7a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v3' },
-  { slug: 'mesa',        name: 'Mesa',        icon: 'M3 10h18M5 10v8M19 10v8M7 14h10' },
   { slug: 'banho',       name: 'Banho',       icon: 'M4 11h16v4a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4v-4z M8 11V6a2 2 0 0 1 4 0' },
   { slug: 'perfumaria',  name: 'Perfumaria',  icon: 'M9 3h6v3H9z M7 6h10l1 4v9a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2v-9z' },
   { slug: 'cosmeticos',  name: 'Cosméticos',  icon: 'M9 3h6v6H9z M8 9h8v12H8z' }
@@ -115,12 +114,6 @@ async function seed() {
     ['Edredom Casal Plumasul Bege', 'cama', 'Edredom dupla face, microfibra antialérgica, enchimento 250g/m².', 249.00, 18, 'https://images.unsplash.com/photo-1631049552240-59c37f38802b?w=600', 1],
     ['Kit 2 Fronhas Acetinadas Rosê', 'cama', 'Cetim 100% poliéster, antifrizz, ideal para cabelo e pele.', 59.90, 60, 'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=600', 0],
     ['Protetor de Colchão Impermeável Solteiro', 'cama', 'Forração 100% algodão com camada impermeável.', 79.90, 30, 'https://images.unsplash.com/photo-1540518614846-7eded433c457?w=600', 0],
-
-    // Mesa
-    ['Toalha de Mesa Retangular Linho 8 lugares', 'mesa', 'Linho misto, bordas acabadas, lavável em máquina.', 139.00, 22, 'https://images.unsplash.com/photo-1567538096630-e0c55bd6374c?w=600', 1],
-    ['Jogo Americano Bambu (4 unidades)', 'mesa', 'Conjunto rústico em bambu trançado, antiderrapante.', 79.90, 40, 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=600', 0],
-    ['Kit 6 Guardanapos Tecido Algodão', 'mesa', 'Algodão premium, costura francesa, várias cores.', 49.90, 80, 'https://images.unsplash.com/photo-1493770348161-369560ae357d?w=600', 0],
-    ['Caminho de Mesa Bordado Provençal', 'mesa', 'Bordado à mão, 1,80m, ideal para almoços especiais.', 99.00, 15, 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=600', 0],
 
     // Banho
     ['Toalha de Banho Gigante Felpuda', 'banho', '100% algodão egípcio, 90x150cm, alta absorção.', 89.90, 50, 'https://images.unsplash.com/photo-1600369671236-e74521d4b6ad?w=600', 1],
