@@ -976,6 +976,25 @@ app.post('/admin/dolar/atualizar-agora', adminAuth, async (req, res) => {
   res.redirect('/admin/dolar');
 });
 
+// Diagnóstico: mostra estado bruto das settings
+app.get('/admin/dolar/debug', adminAuth, async (req, res) => {
+  const [rows] = await pool.execute("SELECT k, v FROM settings WHERE k LIKE 'dolar_%'");
+  const c = await dolar.getRate().catch(e => ({ error: e.message }));
+  res.json({ settings: rows, cotacao: c });
+});
+
+// Aplica configuração via JSON (mais confiável que form)
+app.post('/admin/dolar/aplicar', adminAuth, express.json(), async (req, res) => {
+  const ativo = req.body.ativo ? '1' : '0';
+  const referencia = parseFloat(String(req.body.referencia || '').replace(',', '.')) || 0;
+  const markup = parseFloat(String(req.body.markup || '').replace(',', '.')) || 0;
+  await upsertSetting('dolar_ativo', ativo);
+  if (referencia > 0) await upsertSetting('dolar_referencia', referencia);
+  await upsertSetting('dolar_markup', markup);
+  const [rows] = await pool.execute("SELECT k, v FROM settings WHERE k LIKE 'dolar_%'");
+  res.json({ ok: true, settings: rows });
+});
+
 // Ajusta cotação de referência para o valor de hoje (congela o preço atual)
 app.post('/admin/dolar/usar-cotacao-atual', adminAuth, async (req, res) => {
   const c = await dolar.getRate();
