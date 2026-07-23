@@ -5,7 +5,10 @@
   <div class="product-detail">
     <div class="pd-img" style="background-image:url('<%= p.image_url %>')"></div>
     <div class="pd-info">
-      <span class="prod-cat"><%= (CATEGORIES.find(c=>c.slug===p.category)||{}).name %></span>
+      <div class="prod-cat-row">
+        <span class="prod-cat"><%= (CATEGORIES.find(c=>c.slug===p.category)||{}).name %></span>
+        <% if (p.size) { %><span class="prod-size-badge prod-size-badge-lg">Tamanho: <%= p.size %></span><% } %>
+      </div>
       <h1><%= p.name %></h1>
       <div class="pd-price">
         <strong><%= brl(p.price) %></strong>

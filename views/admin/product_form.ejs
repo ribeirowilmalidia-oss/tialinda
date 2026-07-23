@@ -40,8 +40,32 @@
   </div>
 
   <div class="row-2">
+    <label>Tamanho <span class="muted" style="font-weight:400;font-size:12px">(opcional — aparece como badge)</span>
+      <select name="size">
+        <option value="">— sem tamanho —</option>
+        <optgroup label="Cama">
+          <option value="SOLTEIRO" <%= p && p.size==='SOLTEIRO' ? 'selected' : '' %>>Solteiro</option>
+          <option value="CASAL" <%= p && p.size==='CASAL' ? 'selected' : '' %>>Casal</option>
+          <option value="QUEEN" <%= p && p.size==='QUEEN' ? 'selected' : '' %>>Queen</option>
+          <option value="KING" <%= p && p.size==='KING' ? 'selected' : '' %>>King</option>
+        </optgroup>
+        <optgroup label="Vestuário">
+          <option value="P" <%= p && p.size==='P' ? 'selected' : '' %>>P</option>
+          <option value="M" <%= p && p.size==='M' ? 'selected' : '' %>>M</option>
+          <option value="G" <%= p && p.size==='G' ? 'selected' : '' %>>G</option>
+          <option value="GG" <%= p && p.size==='GG' ? 'selected' : '' %>>GG</option>
+        </optgroup>
+        <optgroup label="Outros">
+          <option value="ÚNICO" <%= p && p.size==='ÚNICO' ? 'selected' : '' %>>Único</option>
+        </optgroup>
+      </select>
+    </label>
     <label>Estoque <input name="stock" type="number" min="0" value="<%= p ? p.stock : 0 %>" required></label>
+  </div>
+
+  <div class="row-2">
     <label class="check-label"><input type="checkbox" name="featured" value="1" <%= p && p.featured ? 'checked' : '' %>> Destacar na home</label>
+    <span></span>
   </div>
 
   <% if (typeof dolarRate !== 'undefined' && dolarRate) { %>

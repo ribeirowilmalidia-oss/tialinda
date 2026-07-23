@@ -5,7 +5,10 @@
     <% if (p.stock === 0) { %><span class="ribbon ribbon-off">Esgotado</span><% } %>
   </a>
   <div class="prod-body">
-    <span class="prod-cat"><%= (CATEGORIES.find(c=>c.slug===p.category)||{}).name || p.category %></span>
+    <div class="prod-cat-row">
+      <span class="prod-cat"><%= (CATEGORIES.find(c=>c.slug===p.category)||{}).name || p.category %></span>
+      <% if (p.size) { %><span class="prod-size-badge"><%= p.size %></span><% } %>
+    </div>
     <a href="/produto/<%= p.id %>" class="prod-name"><%= p.name %></a>
     <div class="prod-price">
       <strong><%= brl(p.price) %></strong>

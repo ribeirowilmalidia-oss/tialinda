@@ -53,6 +53,7 @@ async function migrate() {
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )`);
   try { await pool.execute("ALTER TABLE products ADD COLUMN price_usd DECIMAL(10,2)"); } catch(e) {}
+  try { await pool.execute("ALTER TABLE products ADD COLUMN size VARCHAR(20)"); } catch(e) {}
   await pool.execute(`CREATE TABLE IF NOT EXISTS orders (
     id INT AUTO_INCREMENT PRIMARY KEY,
     customer_name VARCHAR(120) NOT NULL,
@@ -735,17 +736,17 @@ app.post('/admin/produto/salvar', adminAuth, async (req, res) => {
   const { id, name, category, description, price, stock, image_url, featured } = req.body;
   const slug = name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
   const feat = featured ? 1 : 0;
-  // price_usd é opcional — quando definido, sobrescreve o preço BRL dinamicamente
   const rawUsd = String(req.body.price_usd || '').replace(',', '.').trim();
   const price_usd = rawUsd && !isNaN(parseFloat(rawUsd)) && parseFloat(rawUsd) > 0
     ? parseFloat(rawUsd)
     : null;
+  const size = (req.body.size || '').trim().toUpperCase() || null;
   if (id) {
-    await pool.execute('UPDATE products SET name=?, slug=?, category=?, description=?, price=?, price_usd=?, stock=?, image_url=?, featured=? WHERE id=?',
-      [name, slug, category, description, price, price_usd, stock, image_url, feat, id]);
+    await pool.execute('UPDATE products SET name=?, slug=?, category=?, description=?, price=?, price_usd=?, size=?, stock=?, image_url=?, featured=? WHERE id=?',
+      [name, slug, category, description, price, price_usd, size, stock, image_url, feat, id]);
   } else {
-    await pool.execute('INSERT INTO products (name,slug,category,description,price,price_usd,stock,image_url,featured) VALUES (?,?,?,?,?,?,?,?,?)',
-      [name, slug, category, description, price, price_usd, stock, image_url, feat]);
+    await pool.execute('INSERT INTO products (name,slug,category,description,price,price_usd,size,stock,image_url,featured) VALUES (?,?,?,?,?,?,?,?,?,?)',
+      [name, slug, category, description, price, price_usd, size, stock, image_url, feat]);
   }
   res.redirect('/admin/produtos');
 });
@@ -772,19 +773,26 @@ app.post('/admin/pedido/:id/status', adminAuth, async (req, res) => {
   res.redirect('/admin/pedido/' + req.params.id);
 });
 
-// Atualiza price_usd de produtos existentes (usado quando importou antes da coluna existir)
+// Atualiza campos (price_usd, size) de produtos existentes em lote
 app.post('/admin/atualizar-usd', adminAuth, express.json({ limit: '2mb' }), async (req, res) => {
   const items = Array.isArray(req.body) ? req.body : (req.body.items || []);
   let updated = 0, notfound = 0;
   for (const it of items) {
     try {
+      const sets = [];
+      const vals = [];
+      if (it.price_usd !== undefined) { sets.push('price_usd=?'); vals.push(it.price_usd); }
+      if (it.size !== undefined) { sets.push('size=?'); vals.push(it.size ? String(it.size).toUpperCase() : null); }
+      if (it.stock !== undefined) { sets.push('stock=?'); vals.push(parseInt(it.stock, 10) || 0); }
+      if (!sets.length) continue;
+      vals.push(it.slug);
       const [r] = await pool.execute(
-        'UPDATE products SET price_usd=? WHERE slug=?',
-        [it.price_usd, it.slug]
+        'UPDATE products SET ' + sets.join(', ') + ' WHERE slug=?',
+        vals
       );
       if (r.affectedRows > 0) updated++;
       else notfound++;
-    } catch (e) { /* ignora */ }
+    } catch (e) { console.error('[atualizar-usd]', e.message); }
   }
   res.json({ ok: true, updated, notfound, total: items.length });
 });
@@ -818,8 +826,9 @@ app.post('/admin/importar-form', adminAuth, async (req, res) => {
       if (existing && existing.length) { skipped++; details.push({name: p.name, status: 'pulado (já existe)'}); continue; }
       const rawUsd = p.price_usd != null ? parseFloat(String(p.price_usd).replace(',','.')) : null;
       const price_usd = rawUsd && rawUsd > 0 ? rawUsd : null;
+      const size = p.size ? String(p.size).trim().toUpperCase().slice(0,20) : null;
       await pool.execute(
-        'INSERT INTO products (name, slug, category, description, price, price_usd, stock, image_url, featured) VALUES (?,?,?,?,?,?,?,?,?)',
+        'INSERT INTO products (name, slug, category, description, price, price_usd, size, stock, image_url, featured) VALUES (?,?,?,?,?,?,?,?,?,?)',
         [
           String(p.name||'').slice(0,200),
           slug,
@@ -827,6 +836,7 @@ app.post('/admin/importar-form', adminAuth, async (req, res) => {
           String(p.description||'').slice(0,2000),
           Number(p.price)||0,
           price_usd,
+          size,
           parseInt(p.stock,10)||0,
           String(p.image_url||'').slice(0,500),
           p.featured ? 1 : 0

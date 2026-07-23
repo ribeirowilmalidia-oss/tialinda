@@ -15,7 +15,9 @@
       <% products.forEach(p => { %>
         <tr>
           <td><div class="thumb" style="background-image:url('<%= p.image_url %>')"></div></td>
-          <td><strong><%= p.name %></strong><br><small class="muted"><%= p.slug %></small></td>
+          <td><strong><%= p.name %></strong>
+            <% if (p.size) { %><span style="display:inline-block;background:#c4593a;color:#fff;padding:1px 8px;border-radius:10px;font-size:11px;font-weight:600;margin-left:6px;letter-spacing:0.5px"><%= p.size %></span><% } %>
+            <br><small class="muted"><%= p.slug %></small></td>
           <td><%= (CATEGORIES.find(c=>c.slug===p.category)||{}).name %></td>
           <td>
             <%= brl(p.price) %>
