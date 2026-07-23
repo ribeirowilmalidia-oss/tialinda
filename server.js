@@ -8,6 +8,7 @@ const payments = require('./lib/payments');
 const mailer = require('./lib/mailer');
 const correios = require('./lib/correios');
 const mp = require('./lib/mercadopago');
+const dolar = require('./lib/dolar');
 
 // Chave PIX e dados do recebedor (Mercado Pago - Wilma Lidia Ribeiro)
 const PIX_KEY     = process.env.PIX_KEY     || 'ee9e688b-ee8f-4c7d-86e9-7abc7d971cc6';
@@ -72,6 +73,25 @@ async function migrate() {
   // ALTER tolerante caso a tabela já exista (idempotente)
   try { await pool.execute("ALTER TABLE orders ADD COLUMN mp_preference_id VARCHAR(80)"); } catch(e) {}
   try { await pool.execute("ALTER TABLE orders ADD COLUMN mp_payment_id VARCHAR(80)"); } catch(e) {}
+  await pool.execute(`CREATE TABLE IF NOT EXISTS settings (
+    k VARCHAR(80) PRIMARY KEY,
+    v TEXT
+  )`);
+  // Defaults do reajuste pelo dólar (idempotente)
+  const defaults = [
+    ['dolar_ativo', '0'],
+    ['dolar_referencia', '5.50'],
+    ['dolar_markup', '0'],
+    ['dolar_ultima_cotacao', ''],
+    ['dolar_ultima_atualizacao', '']
+  ];
+  for (const [k, v] of defaults) {
+    try {
+      const [ex] = await pool.execute('SELECT k FROM settings WHERE k=?', [k]);
+      if (!ex.length) await pool.execute('INSERT INTO settings (k,v) VALUES (?,?)', [k, v]);
+    } catch (e) { console.error('[settings default]', k, e.message); }
+  }
+
   await pool.execute(`CREATE TABLE IF NOT EXISTS order_items (
     id INT AUTO_INCREMENT PRIMARY KEY,
     order_id INT NOT NULL,
@@ -148,17 +168,19 @@ function calcShipping(cep, subtotal) {
 function genTrack() {
   return 'TL' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).slice(2, 5).toUpperCase();
 }
-async function cartDetail(cart) {
+async function cartDetail(cart, factor) {
   if (!cart.length) return { items: [], subtotal: 0 };
   const ids = cart.map(c => c.id);
   const placeholders = ids.map(() => '?').join(',');
   const [rows] = await pool.execute(`SELECT id, name, slug, price, stock, image_url, category FROM products WHERE id IN (${placeholders})`, ids);
+  const f = Number(factor) || 1;
   const map = new Map(rows.map(r => [r.id, r]));
   const items = cart.map(c => {
     const p = map.get(c.id);
     if (!p) return null;
     const qty = Math.min(c.qty, p.stock);
-    return { ...p, qty, line: Number(p.price) * qty };
+    const adjustedPrice = Math.round(Number(p.price) * f * 100) / 100;
+    return { ...p, price: adjustedPrice, qty, line: adjustedPrice * qty };
   }).filter(Boolean);
   const subtotal = items.reduce((s, i) => s + i.line, 0);
   return { items, subtotal };
@@ -167,18 +189,85 @@ async function cartDetail(cart) {
 app.locals.brl = brl;
 app.locals.CATEGORIES = CATEGORIES;
 
+// ---------- Reajuste diário pelo dólar ----------
+async function getDolarSettings() {
+  try {
+    const [rows] = await pool.execute(
+      "SELECT k, v FROM settings WHERE k IN ('dolar_ativo','dolar_referencia','dolar_markup')"
+    );
+    const m = {};
+    rows.forEach(r => m[r.k] = r.v);
+    return {
+      ativo: m.dolar_ativo === '1',
+      referencia: parseFloat(m.dolar_referencia) || 0,
+      markup: parseFloat(m.dolar_markup) || 0
+    };
+  } catch (e) {
+    return { ativo: false, referencia: 0, markup: 0 };
+  }
+}
+
+// Guarda o último fator aplicado por request (evita batidas repetidas na API)
+async function currentPriceFactor() {
+  const s = await getDolarSettings();
+  if (!s.ativo || !s.referencia) return { factor: 1, active: false };
+  const c = await dolar.getRate();
+  if (!c.rate) return { factor: 1, active: false, error: 'sem cotação' };
+  // Persiste cotação em cache no banco (para exibir no admin)
+  try {
+    await pool.execute("UPDATE settings SET v=? WHERE k='dolar_ultima_cotacao'", [String(c.rate)]);
+    await pool.execute("UPDATE settings SET v=? WHERE k='dolar_ultima_atualizacao'", [new Date().toISOString()]);
+  } catch (e) {}
+  return {
+    factor: dolar.calcFactor(c.rate, s.referencia, s.markup),
+    active: true,
+    rate: c.rate,
+    reference: s.referencia,
+    markup: s.markup,
+    source: c.source
+  };
+}
+
+// Aplica o fator ao preço de um produto ou lista
+function applyFactor(item, factor) {
+  if (!item || factor === 1) return item;
+  if (Array.isArray(item)) return item.map(i => applyFactor(i, factor));
+  const clone = { ...item };
+  if (clone.price != null) clone.price = Math.round(Number(clone.price) * factor * 100) / 100;
+  if (clone.line != null)  clone.line  = Math.round(Number(clone.line)  * factor * 100) / 100;
+  return clone;
+}
+
 app.use(async (req, res, next) => {
   const cart = getCart(req);
   res.locals.cartCount = cart.reduce((s, c) => s + c.qty, 0);
   res.locals.path = req.path;
+  // Disponibiliza fator do dólar para todas as views (não bate na API em rotas admin/api)
+  if (!req.path.startsWith('/admin') && !req.path.startsWith('/api/') && !req.path.startsWith('/webhook')) {
+    try {
+      const pf = await currentPriceFactor();
+      res.locals.priceFactor = pf.factor;
+      res.locals.priceFactorInfo = pf;
+    } catch (e) {
+      res.locals.priceFactor = 1;
+      res.locals.priceFactorInfo = { active: false };
+    }
+  } else {
+    res.locals.priceFactor = 1;
+    res.locals.priceFactorInfo = { active: false };
+  }
   next();
 });
+
+// Wrapper que ajusta preços após query — usado nas rotas públicas
+function adjust(rows, factor) { return applyFactor(rows, factor || 1); }
 
 // ---------- Public routes ----------
 app.get('/', async (req, res) => {
   const [featured] = await pool.execute('SELECT * FROM products WHERE featured=1 ORDER BY RAND() LIMIT 8');
   const [latest] = await pool.execute('SELECT * FROM products ORDER BY created_at DESC LIMIT 4');
-  res.render('home', { featured, latest });
+  const f = res.locals.priceFactor;
+  res.render('home', { featured: adjust(featured, f), latest: adjust(latest, f) });
 });
 
 // ---------- SEO: robots.txt + sitemap.xml ----------
@@ -229,14 +318,16 @@ app.get('/categoria/:slug', async (req, res) => {
   const cat = CATEGORIES.find(c => c.slug === req.params.slug);
   if (!cat) return res.status(404).render('404');
   const [products] = await pool.execute('SELECT * FROM products WHERE category=? ORDER BY featured DESC, name', [cat.slug]);
-  res.render('category', { cat, products });
+  const f = res.locals.priceFactor;
+  res.render('category', { cat, products: adjust(products, f) });
 });
 
 app.get('/produto/:id', async (req, res) => {
   const [[p]] = await pool.execute('SELECT * FROM products WHERE id=?', [req.params.id]);
   if (!p) return res.status(404).render('404');
   const [related] = await pool.execute('SELECT * FROM products WHERE category=? AND id<>? ORDER BY RAND() LIMIT 4', [p.category, p.id]);
-  res.render('product', { p, related });
+  const f = res.locals.priceFactor;
+  res.render('product', { p: applyFactor(p, f), related: adjust(related, f) });
 });
 
 function cookieRedirect(res, url, msg) {
@@ -268,18 +359,18 @@ app.post('/carrinho/atualizar', (req, res) => {
 });
 
 app.get('/carrinho', async (req, res) => {
-  const detail = await cartDetail(getCart(req));
+  const detail = await cartDetail(getCart(req), res.locals.priceFactor);
   res.render('cart', detail);
 });
 
 app.get('/checkout', async (req, res) => {
-  const detail = await cartDetail(getCart(req));
+  const detail = await cartDetail(getCart(req), res.locals.priceFactor);
   if (!detail.items.length) return res.redirect('/carrinho');
   res.render('checkout', detail);
 });
 
 app.post('/checkout/frete', async (req, res) => {
-  const detail = await cartDetail(getCart(req));
+  const detail = await cartDetail(getCart(req), res.locals.priceFactor);
   const pkg = correios.packageFromItems(detail.items);
   const quote = correios.calcShipping(req.body.cep, pkg);
   if (!quote) return res.json({ error: 'CEP inválido' });
@@ -293,7 +384,7 @@ app.post('/checkout/frete', async (req, res) => {
 });
 
 app.post('/checkout/finalizar', async (req, res) => {
-  const detail = await cartDetail(getCart(req));
+  const detail = await cartDetail(getCart(req), res.locals.priceFactor);
   if (!detail.items.length) return res.redirect('/carrinho');
   const { name, email, phone, cep, address, city, state, payment } = req.body;
   const shippingService = (req.body.shipping_service || 'PAC').toUpperCase();
@@ -578,7 +669,19 @@ app.get('/admin', adminAuth, async (req, res) => {
   const [[pend]] = await pool.execute("SELECT COUNT(*) c FROM orders WHERE status='pendente'");
   const [low] = await pool.execute('SELECT id, name, stock FROM products WHERE stock < 10 ORDER BY stock ASC LIMIT 6');
   const [recent] = await pool.execute('SELECT id, customer_name, total, status, created_at FROM orders ORDER BY id DESC LIMIT 6');
-  res.render('admin/dashboard', { stats, ord, pend, low, recent });
+  const dolarSettings = await getDolarSettings();
+  let dolarBadge = null;
+  if (dolarSettings.ativo) {
+    const c = await dolar.getRate().catch(() => ({ rate: null }));
+    if (c.rate) {
+      dolarBadge = {
+        rate: c.rate,
+        factor: dolar.calcFactor(c.rate, dolarSettings.referencia, dolarSettings.markup),
+        reference: dolarSettings.referencia
+      };
+    }
+  }
+  res.render('admin/dashboard', { stats, ord, pend, low, recent, dolarBadge });
 });
 
 app.get('/admin/produtos', adminAuth, async (req, res) => {
@@ -660,6 +763,49 @@ app.post('/admin/importar', adminAuth, express.json({ limit: '4mb' }), async (re
     }
   }
   res.json({ ok: true, total: items.length, inserted, skipped, errors });
+});
+
+// ---------- Admin: Reajuste diário pelo dólar ----------
+app.get('/admin/dolar', adminAuth, async (req, res) => {
+  const [rows] = await pool.execute("SELECT k, v FROM settings WHERE k LIKE 'dolar_%'");
+  const s = {};
+  rows.forEach(r => s[r.k] = r.v);
+  const cot = await dolar.getRate().catch(() => ({ rate: null, source: 'erro' }));
+  const referencia = parseFloat(s.dolar_referencia) || 0;
+  const markup = parseFloat(s.dolar_markup) || 0;
+  const ativo = s.dolar_ativo === '1';
+  const factor = (cot.rate && referencia) ? dolar.calcFactor(cot.rate, referencia, markup) : 1;
+  res.render('admin/dolar', {
+    ativo, referencia, markup,
+    cotacao: cot.rate,
+    fonte: cot.source,
+    factor,
+    ultimaAtualizacao: s.dolar_ultima_atualizacao || ''
+  });
+});
+
+app.post('/admin/dolar/salvar', adminAuth, async (req, res) => {
+  const ativo = req.body.ativo ? '1' : '0';
+  const referencia = parseFloat(String(req.body.referencia).replace(',', '.')) || 0;
+  const markup = parseFloat(String(req.body.markup).replace(',', '.')) || 0;
+  await pool.execute("UPDATE settings SET v=? WHERE k='dolar_ativo'", [ativo]);
+  await pool.execute("UPDATE settings SET v=? WHERE k='dolar_referencia'", [String(referencia)]);
+  await pool.execute("UPDATE settings SET v=? WHERE k='dolar_markup'", [String(markup)]);
+  res.redirect('/admin/dolar');
+});
+
+app.post('/admin/dolar/atualizar-agora', adminAuth, async (req, res) => {
+  await dolar.refresh();
+  res.redirect('/admin/dolar');
+});
+
+// Ajusta cotação de referência para o valor de hoje (congela o preço atual)
+app.post('/admin/dolar/usar-cotacao-atual', adminAuth, async (req, res) => {
+  const c = await dolar.getRate();
+  if (c.rate) {
+    await pool.execute("UPDATE settings SET v=? WHERE k='dolar_referencia'", [String(c.rate)]);
+  }
+  res.redirect('/admin/dolar');
 });
 
 // Diagnóstico de e-mail — mostra config ativa e tenta enviar um e-mail de teste

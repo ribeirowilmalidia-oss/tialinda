@@ -1,0 +1,99 @@
+<% const title='Reajuste pelo Dólar'; %><%- include('_head') %>
+
+<header class="admin-header">
+  <h1>Reajuste diário pelo dólar</h1>
+  <p class="muted">Preços da loja atualizados automaticamente conforme a cotação USD/BRL. O preço no cadastro não muda — o ajuste é aplicado em tempo real.</p>
+</header>
+
+<div class="kpi-grid">
+  <div class="kpi">
+    <small>Cotação USD/BRL agora</small>
+    <strong><%= cotacao ? 'R$ ' + Number(cotacao).toFixed(4).replace('.', ',') : '—' %></strong>
+    <p class="muted" style="margin:6px 0 0;font-size:12px">Fonte: <%= fonte || '(cache)' %></p>
+  </div>
+  <div class="kpi <%= ativo ? 'kpi-accent' : '' %>">
+    <small>Fator aplicado</small>
+    <strong><%= ativo ? factor.toFixed(4) + '×' : '1,0000× off' %></strong>
+    <p class="muted" style="margin:6px 0 0;font-size:12px">
+      <% if (ativo && cotacao) { %>
+        (<%= cotacao.toFixed(2) %> ÷ <%= referencia.toFixed(2) %>) × (1 + <%= (markup*100).toFixed(1) %>%)
+      <% } else { %>
+        Desativado — preços do cadastro
+      <% } %>
+    </p>
+  </div>
+  <div class="kpi">
+    <small>Exemplo: R$ 100 cadastro</small>
+    <strong>R$ <%= (100 * (ativo ? factor : 1)).toFixed(2).replace('.', ',') %></strong>
+    <p class="muted" style="margin:6px 0 0;font-size:12px">Preço exibido na loja</p>
+  </div>
+  <div class="kpi">
+    <small>Última atualização</small>
+    <strong style="font-size:14px"><%= ultimaAtualizacao ? new Date(ultimaAtualizacao).toLocaleString('pt-BR') : '—' %></strong>
+    <form method="POST" action="/admin/dolar/atualizar-agora" style="margin-top:8px">
+      <button type="submit" style="background:transparent;border:1px solid #ddd;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:12px">↻ Buscar agora</button>
+    </form>
+  </div>
+</div>
+
+<div class="admin-grid" style="margin-top:24px">
+  <section class="card">
+    <div class="card-head"><h2>Configurações</h2></div>
+    <form method="POST" action="/admin/dolar/salvar" style="padding:6px 4px">
+
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#f7f4ee;border-radius:10px;margin-bottom:18px">
+        <input type="checkbox" name="ativo" id="ativo" value="1" <%= ativo ? 'checked' : '' %> style="width:20px;height:20px;cursor:pointer">
+        <label for="ativo" style="cursor:pointer;flex:1">
+          <strong>Ativar reajuste pelo dólar</strong><br>
+          <span class="muted" style="font-size:13px">Quando desmarcado, preços aparecem exatamente como cadastrados.</span>
+        </label>
+      </div>
+
+      <div style="margin-bottom:16px">
+        <label style="display:block;font-weight:600;margin-bottom:6px">Cotação de referência (R$)</label>
+        <input type="number" step="0.0001" min="1" max="20" name="referencia" value="<%= referencia.toFixed(4) %>" required style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:15px">
+        <small class="muted" style="display:block;margin-top:4px">Cotação do dólar no dia em que você definiu os preços atuais. Se o dólar hoje estiver acima, preços sobem proporcionalmente.</small>
+      </div>
+
+      <div style="margin-bottom:20px">
+        <label style="display:block;font-weight:600;margin-bottom:6px">Markup adicional (%)</label>
+        <input type="number" step="0.1" min="-50" max="200" name="markup" value="<%= (markup*100).toFixed(1) %>" required style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:15px" oninput="this.value=this.value">
+        <small class="muted" style="display:block;margin-top:4px">Percentual extra aplicado sobre o fator do dólar. Use 0 = cotação pura, 5 = +5%, 10 = +10%.</small>
+      </div>
+
+      <input type="hidden" name="_markup_pct" value="1">
+      <button type="submit" class="btn btn-primary">Salvar configurações</button>
+    </form>
+
+    <form method="POST" action="/admin/dolar/usar-cotacao-atual" style="margin:14px 0 0;padding:14px;border-top:1px dashed #e6e2d8">
+      <button type="submit" class="btn btn-soft" onclick="return confirm('Definir a cotação de referência para R$ <%= cotacao ? cotacao.toFixed(4) : 0 %>? Os preços vão ficar igual ao cadastro a partir de agora.')" style="width:100%">
+        📌 Congelar preços atuais (usar cotação de hoje como referência)
+      </button>
+    </form>
+  </section>
+
+  <section class="card">
+    <div class="card-head"><h2>Como funciona</h2></div>
+    <ol style="line-height:1.7;padding:0 4px 4px 22px;font-size:14px">
+      <li>Cadastre os produtos com preços em BRL normalmente.</li>
+      <li>Defina a <strong>cotação de referência</strong> = valor do dólar no dia dos preços atuais.</li>
+      <li>Diariamente o site busca a cotação USD/BRL via <strong>awesomeapi.com.br</strong> (com fallback no <strong>Banco Central</strong>).</li>
+      <li>O fator = cotação_hoje ÷ cotação_referência × (1 + markup).</li>
+      <li>Se dólar subir de R$ 5,50 → R$ 5,72, fator = 1,04 → toalha de R$ 89,90 vai para R$ 93,50.</li>
+      <li>A cotação fica em cache por 6h para não sobrecarregar a API.</li>
+      <li>O preço no banco de dados <strong>nunca é alterado</strong>. Se desativar o reajuste, tudo volta ao normal.</li>
+    </ol>
+    <p class="muted" style="margin-top:14px;font-size:13px;padding:0 4px">💡 Dica: se você importa/compra em dólar, defina a referência = cotação do dia em que você comprou o estoque. Assim, se o dólar disparar, você não vende no prejuízo.</p>
+  </section>
+</div>
+
+<script>
+// Converte o input markup (que o usuário digita em %) para o fator decimal antes de submeter
+document.querySelector('form[action="/admin/dolar/salvar"]').addEventListener('submit', function(e){
+  const mkInput = this.querySelector('[name=markup]');
+  const pct = parseFloat(String(mkInput.value).replace(',', '.')) || 0;
+  mkInput.value = (pct / 100).toString();
+});
+</script>
+
+<%- include('_foot') %>

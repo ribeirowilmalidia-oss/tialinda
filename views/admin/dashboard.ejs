@@ -11,6 +11,13 @@
   <div class="kpi"><small>Pedidos no total</small><strong><%= ord.total %></strong></div>
   <div class="kpi kpi-accent"><small>Receita acumulada</small><strong><%= brl(ord.revenue || 0) %></strong></div>
   <div class="kpi"><small>Pedidos pendentes</small><strong><%= pend.c %></strong></div>
+  <% if (typeof dolarBadge !== 'undefined' && dolarBadge) { %>
+    <div class="kpi">
+      <small>Dólar hoje · fator <%= dolarBadge.factor.toFixed(3) %>×</small>
+      <strong>R$ <%= dolarBadge.rate.toFixed(2).replace('.', ',') %></strong>
+      <a href="/admin/dolar" style="font-size:12px;color:#c4593a">ajustar →</a>
+    </div>
+  <% } %>
 </div>
 
 <div class="admin-grid">
