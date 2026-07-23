@@ -63,6 +63,22 @@
     <label>Estoque <input name="stock" type="number" min="0" value="<%= p ? p.stock : 0 %>" required></label>
   </div>
 
+  <div style="background:#faf6ef;border:1px solid #e6d9c3;border-radius:12px;padding:14px 16px;margin:6px 0 14px">
+    <strong>🎨 Cor <span class="muted" style="font-weight:400;font-size:12px">— para produtos com variação de cor</span></strong>
+    <div class="row-2" style="margin-top:8px">
+      <label>Nome da cor <span class="muted" style="font-weight:400;font-size:12px">(ex: Azul Marinho)</span>
+        <input name="color" value="<%= p && p.color ? p.color : '' %>" placeholder="Ex: Bege">
+      </label>
+      <label>Cor (hex) <span class="muted" style="font-weight:400;font-size:12px">(bolinha no site)</span>
+        <input name="color_hex" type="color" value="<%= p && p.color_hex ? p.color_hex : '#cccccc' %>">
+      </label>
+    </div>
+    <label style="display:block;margin-top:6px">Família (grupo de variações)
+      <input name="family" value="<%= p && p.family ? p.family : '' %>" placeholder="Ex: kit-lencol-torero-4pc-3000f-queen">
+      <small class="muted" style="font-size:12px">Produtos com a mesma família aparecem juntos como opções de cor. Deixe em branco para agrupar automaticamente pelo nome.</small>
+    </label>
+  </div>
+
   <div class="row-2">
     <label class="check-label"><input type="checkbox" name="featured" value="1" <%= p && p.featured ? 'checked' : '' %>> Destacar na home</label>
     <span></span>

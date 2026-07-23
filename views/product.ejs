@@ -15,6 +15,28 @@
         <span class="muted">ou 3x de <%= brl(p.price/3) %> sem juros</span>
       </div>
       <p class="pd-desc"><%= p.description %></p>
+      <% if (typeof variants !== 'undefined' && variants && variants.length > 1) { %>
+        <div class="pd-colors">
+          <div class="pd-colors-label">Cor: <strong><%= p.color || 'Padrão' %></strong></div>
+          <div class="pd-swatches">
+            <% variants.forEach(v => { %>
+              <a href="/produto/<%= v.id %>"
+                 class="swatch <%= v.id === p.id ? 'is-active' : '' %> <%= v.stock === 0 ? 'is-off' : '' %>"
+                 title="<%= v.color || v.name %>"
+                 <% if (v.color_hex) { %>style="--sw:<%= v.color_hex %>"<% } %>>
+                <% if (v.color_hex) { %>
+                  <span class="swatch-dot"></span>
+                <% } else if (v.image_url) { %>
+                  <span class="swatch-img" style="background-image:url('<%= v.image_url %>')"></span>
+                <% } else { %>
+                  <span class="swatch-txt"><%= (v.color || v.name).slice(0,3).toUpperCase() %></span>
+                <% } %>
+                <span class="swatch-label"><%= v.color || 'variação' %></span>
+              </a>
+            <% }) %>
+          </div>
+        </div>
+      <% } %>
       <div class="pd-stock">
         <% if (p.stock > 5) { %>
           <span class="dot dot-ok"></span> Em estoque · pronta entrega

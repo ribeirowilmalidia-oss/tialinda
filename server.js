@@ -53,6 +53,9 @@ async function migrate() {
   )`);
   try { await pool.execute("ALTER TABLE products ADD COLUMN price_usd DECIMAL(10,2)"); } catch(e) {}
   try { await pool.execute("ALTER TABLE products ADD COLUMN size VARCHAR(20)"); } catch(e) {}
+  try { await pool.execute("ALTER TABLE products ADD COLUMN color VARCHAR(40)"); } catch(e) {}
+  try { await pool.execute("ALTER TABLE products ADD COLUMN color_hex VARCHAR(9)"); } catch(e) {}
+  try { await pool.execute("ALTER TABLE products ADD COLUMN family VARCHAR(120)"); } catch(e) {}
   await pool.execute(`CREATE TABLE IF NOT EXISTS orders (
     id INT AUTO_INCREMENT PRIMARY KEY,
     customer_name VARCHAR(120) NOT NULL,
@@ -349,9 +352,44 @@ app.get('/produto/:id', async (req, res) => {
   const [[p]] = await pool.execute('SELECT * FROM products WHERE id=?', [req.params.id]);
   if (!p) return res.status(404).render('404');
   const [related] = await pool.execute('SELECT * FROM products WHERE category=? AND id<>? ORDER BY RAND() LIMIT 4', [p.category, p.id]);
+  // Variações de cor (mesma família OU mesmo nome-base). Só considera se houver > 1.
+  let variants = [];
+  if (p.family) {
+    const [rows] = await pool.execute('SELECT id, name, slug, color, color_hex, image_url, stock FROM products WHERE family=? ORDER BY color', [p.family]);
+    if (rows.length > 1) variants = rows;
+  }
+  if (!variants.length) {
+    const base = baseName(p.name);
+    if (base && base.length > 6) {
+      const [rows] = await pool.execute("SELECT id, name, slug, color, color_hex, image_url, stock FROM products WHERE category=? AND name LIKE ? ORDER BY name", [p.category, base + '%']);
+      const filtered = rows.filter(r => baseName(r.name) === base);
+      if (filtered.length > 1) variants = filtered;
+    }
+  }
   const f = res.locals.priceFactorInfo;
-  res.render('product', { p: applyFactor(p, f), related: adjust(related, f) });
+  res.render('product', { p: applyFactor(p, f), related: adjust(related, f), variants });
 });
+
+// Extrai o "nome base" tirando cor/variação, para agrupar produtos irmãos automaticamente.
+function baseName(name) {
+  if (!name) return '';
+  const COLORS = ['bege','marfim','branco','preto','cinza','chumbo','grafite','azul','azul marinho','azul royal','azul bebê','azul bebe','azul claro','verde','verde menta','verde claro','verde água','verde agua','vermelho','vinho','rosa','rosa antigo','rosa coral','rose','ros\u00ea','lilás','lilas','amarelo','laranja','marrom','café','cafe','chocolate','caramelo','areia','taupe','marinho','nude','dourado','prata'];
+  let s = String(name);
+  // remove sufixos "cor X" ou "X liso" no fim
+  const lower = s.toLowerCase();
+  let cut = s.length;
+  for (const c of COLORS) {
+    const idx = lower.indexOf(' ' + c);
+    if (idx > 10 && idx < cut) cut = idx;
+  }
+  s = s.slice(0, cut);
+  // remove códigos numéricos tipo "150014"
+  s = s.replace(/\s*[0-9]{4,}\s*$/, '');
+  // remove sufixos comuns
+  s = s.replace(/\s*(c\/\s*bordado|com\s+bordado|liso)\s*$/i, '');
+  s = s.replace(/\s+[-·—]\s+.*$/, '');
+  return s.trim();
+}
 
 function cookieRedirect(res, url, msg) {
   res.set('Cache-Control', 'no-store');
@@ -734,12 +772,17 @@ app.post('/admin/produto/salvar', adminAuth, async (req, res) => {
     ? parseFloat(rawUsd)
     : null;
   const size = (req.body.size || '').trim().toUpperCase() || null;
+  const color = (req.body.color || '').trim() || null;
+  let color_hex = (req.body.color_hex || '').trim() || null;
+  if (color_hex && !/^#[0-9a-fA-F]{6}$/.test(color_hex)) color_hex = null;
+  if (color_hex && color_hex.toLowerCase() === '#cccccc' && !color) color_hex = null;
+  const family = (req.body.family || '').trim() || null;
   if (id) {
-    await pool.execute('UPDATE products SET name=?, slug=?, category=?, description=?, price=?, price_usd=?, size=?, stock=?, image_url=?, featured=? WHERE id=?',
-      [name, slug, category, description, price, price_usd, size, stock, image_url, feat, id]);
+    await pool.execute('UPDATE products SET name=?, slug=?, category=?, description=?, price=?, price_usd=?, size=?, color=?, color_hex=?, family=?, stock=?, image_url=?, featured=? WHERE id=?',
+      [name, slug, category, description, price, price_usd, size, color, color_hex, family, stock, image_url, feat, id]);
   } else {
-    await pool.execute('INSERT INTO products (name,slug,category,description,price,price_usd,size,stock,image_url,featured) VALUES (?,?,?,?,?,?,?,?,?,?)',
-      [name, slug, category, description, price, price_usd, size, stock, image_url, feat]);
+    await pool.execute('INSERT INTO products (name,slug,category,description,price,price_usd,size,color,color_hex,family,stock,image_url,featured) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
+      [name, slug, category, description, price, price_usd, size, color, color_hex, family, stock, image_url, feat]);
   }
   res.redirect('/admin/produtos');
 });
@@ -778,6 +821,13 @@ app.post('/admin/atualizar-usd', adminAuth, express.json({ limit: '2mb' }), asyn
       if (it.size !== undefined) { sets.push('size=?'); vals.push(it.size ? String(it.size).toUpperCase() : null); }
       if (it.stock !== undefined) { sets.push('stock=?'); vals.push(parseInt(it.stock, 10) || 0); }
       if (it.image_url !== undefined) { sets.push('image_url=?'); vals.push(String(it.image_url||'').slice(0,500)); }
+      if (it.color !== undefined) { sets.push('color=?'); vals.push(it.color ? String(it.color).slice(0,40) : null); }
+      if (it.color_hex !== undefined) {
+        let ch = it.color_hex ? String(it.color_hex).slice(0,9) : null;
+        if (ch && !/^#[0-9a-fA-F]{6}$/.test(ch)) ch = null;
+        sets.push('color_hex=?'); vals.push(ch);
+      }
+      if (it.family !== undefined) { sets.push('family=?'); vals.push(it.family ? String(it.family).slice(0,120) : null); }
       if (!sets.length) continue;
       vals.push(it.slug);
       const [r] = await pool.execute(

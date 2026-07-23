@@ -17,7 +17,9 @@
           <td><div class="thumb" style="background-image:url('<%= p.image_url %>')"></div></td>
           <td><strong><%= p.name %></strong>
             <% if (p.size) { %><span style="display:inline-block;background:#c4593a;color:#fff;padding:1px 8px;border-radius:10px;font-size:11px;font-weight:600;margin-left:6px;letter-spacing:0.5px"><%= p.size %></span><% } %>
-            <br><small class="muted"><%= p.slug %></small></td>
+            <% if (p.color) { %><span style="display:inline-flex;align-items:center;gap:5px;background:#f4ede0;color:#5a4a2f;padding:1px 8px;border-radius:10px;font-size:11px;font-weight:600;margin-left:6px"><% if (p.color_hex) { %><span style="width:10px;height:10px;border-radius:50%;background:<%= p.color_hex %>;box-shadow:inset 0 0 0 1px rgba(0,0,0,.15)"></span><% } %><%= p.color %></span><% } %>
+            <br><small class="muted"><%= p.slug %></small>
+            <% if (p.family) { %><br><small style="color:#7a5c33;font-size:10px">👥 <%= p.family %></small><% } %></td>
           <td><%= (CATEGORIES.find(c=>c.slug===p.category)||{}).name %></td>
           <td>
             <%= brl(p.price) %>
