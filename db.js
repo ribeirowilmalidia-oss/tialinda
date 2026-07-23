@@ -52,21 +52,31 @@ function makePgAdapter(connectionString) {
   function isDdl(sql)    { return /^\s*(create|alter|drop)\s+/i.test(sql); }
   function hasReturning(sql) { return /\breturning\b/i.test(sql); }
 
+  // Tabelas que não têm coluna "id" — não devem receber RETURNING id automático
+  const NO_ID_TABLES = ['settings'];
+  function insertTargetTable(sql) {
+    const m = /^\s*insert\s+into\s+([`"a-z0-9_]+)/i.exec(sql);
+    if (!m) return null;
+    return m[1].replace(/[`"]/g, '').toLowerCase();
+  }
+
   async function run(client, sql, params) {
     let q = translate(sql);
-    // Para INSERTs sem RETURNING, anexa "RETURNING id" para emular insertId do mysql2
-    if (isInsert(q) && !hasReturning(q)) q = q + ' RETURNING id';
+    // Para INSERTs sem RETURNING, anexa "RETURNING id" para emular insertId do mysql2 —
+    // mas apenas em tabelas que têm coluna id.
+    const tbl = insertTargetTable(q);
+    const insertHasId = isInsert(q) && !hasReturning(q) && (!tbl || !NO_ID_TABLES.includes(tbl));
+    if (insertHasId) q = q + ' RETURNING id';
     const res = await client.query(q, params || []);
     if (isSelect(q) || hasReturning(q)) {
       const rows = res.rows;
-      // mysql2: [rows, fields]. INSERT...RETURNING id: simula {insertId, affectedRows}.
       if (isInsert(sql) && rows.length) {
         return [{ insertId: rows[0].id, affectedRows: res.rowCount }, undefined];
       }
       return [rows, undefined];
     }
     if (isDdl(q)) return [{ affectedRows: 0 }, undefined];
-    // UPDATE / DELETE
+    if (isInsert(q)) return [{ affectedRows: res.rowCount, insertId: 0 }, undefined];
     return [{ affectedRows: res.rowCount, insertId: 0 }, undefined];
   }
 
