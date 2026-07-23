@@ -951,13 +951,23 @@ app.get('/admin/dolar', adminAuth, async (req, res) => {
   });
 });
 
+async function upsertSetting(k, v) {
+  const [r] = await pool.execute("UPDATE settings SET v=? WHERE k=?", [String(v), k]);
+  if (!r || r.affectedRows === 0) {
+    try { await pool.execute("INSERT INTO settings (k,v) VALUES (?,?)", [k, String(v)]); } catch(e) {
+      // race: try update again
+      await pool.execute("UPDATE settings SET v=? WHERE k=?", [String(v), k]);
+    }
+  }
+}
+
 app.post('/admin/dolar/salvar', adminAuth, async (req, res) => {
   const ativo = req.body.ativo ? '1' : '0';
   const referencia = parseFloat(String(req.body.referencia).replace(',', '.')) || 0;
   const markup = parseFloat(String(req.body.markup).replace(',', '.')) || 0;
-  await pool.execute("UPDATE settings SET v=? WHERE k='dolar_ativo'", [ativo]);
-  await pool.execute("UPDATE settings SET v=? WHERE k='dolar_referencia'", [String(referencia)]);
-  await pool.execute("UPDATE settings SET v=? WHERE k='dolar_markup'", [String(markup)]);
+  await upsertSetting('dolar_ativo', ativo);
+  await upsertSetting('dolar_referencia', referencia);
+  await upsertSetting('dolar_markup', markup);
   res.redirect('/admin/dolar');
 });
 
@@ -970,7 +980,7 @@ app.post('/admin/dolar/atualizar-agora', adminAuth, async (req, res) => {
 app.post('/admin/dolar/usar-cotacao-atual', adminAuth, async (req, res) => {
   const c = await dolar.getRate();
   if (c.rate) {
-    await pool.execute("UPDATE settings SET v=? WHERE k='dolar_referencia'", [String(c.rate)]);
+    await upsertSetting('dolar_referencia', c.rate);
   }
   res.redirect('/admin/dolar');
 });
