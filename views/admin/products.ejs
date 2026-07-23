@@ -17,7 +17,10 @@
           <td><div class="thumb" style="background-image:url('<%= p.image_url %>')"></div></td>
           <td><strong><%= p.name %></strong><br><small class="muted"><%= p.slug %></small></td>
           <td><%= (CATEGORIES.find(c=>c.slug===p.category)||{}).name %></td>
-          <td><%= brl(p.price) %></td>
+          <td>
+            <%= brl(p.price) %>
+            <% if (p.price_usd) { %><br><small style="color:#c4593a">💵 US$ <%= Number(p.price_usd).toFixed(2) %></small><% } %>
+          </td>
           <td><strong class="<%= p.stock < 5 ? 'danger' : p.stock < 10 ? 'warn' : '' %>"><%= p.stock %></strong></td>
           <td class="actions">
             <a href="/admin/produto/<%= p.id %>" class="btn btn-soft btn-sm">Editar</a>

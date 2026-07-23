@@ -46,11 +46,13 @@ async function migrate() {
     category VARCHAR(40) NOT NULL,
     description TEXT,
     price DECIMAL(10,2) NOT NULL,
+    price_usd DECIMAL(10,2),
     stock INT NOT NULL DEFAULT 0,
     image_url VARCHAR(500),
     featured TINYINT DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )`);
+  try { await pool.execute("ALTER TABLE products ADD COLUMN price_usd DECIMAL(10,2)"); } catch(e) {}
   await pool.execute(`CREATE TABLE IF NOT EXISTS orders (
     id INT AUTO_INCREMENT PRIMARY KEY,
     customer_name VARCHAR(120) NOT NULL,
@@ -168,18 +170,26 @@ function calcShipping(cep, subtotal) {
 function genTrack() {
   return 'TL' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).slice(2, 5).toUpperCase();
 }
-async function cartDetail(cart, factor) {
+async function cartDetail(cart, pf) {
   if (!cart.length) return { items: [], subtotal: 0 };
   const ids = cart.map(c => c.id);
   const placeholders = ids.map(() => '?').join(',');
-  const [rows] = await pool.execute(`SELECT id, name, slug, price, stock, image_url, category FROM products WHERE id IN (${placeholders})`, ids);
-  const f = Number(factor) || 1;
+  const [rows] = await pool.execute(`SELECT id, name, slug, price, price_usd, stock, image_url, category FROM products WHERE id IN (${placeholders})`, ids);
+  const factor = (pf && pf.factor) || (typeof pf === 'number' ? pf : 1);
+  const rate = pf && pf.rate;
+  const markup = (pf && pf.markup) || 0;
   const map = new Map(rows.map(r => [r.id, r]));
   const items = cart.map(c => {
     const p = map.get(c.id);
     if (!p) return null;
     const qty = Math.min(c.qty, p.stock);
-    const adjustedPrice = Math.round(Number(p.price) * f * 100) / 100;
+    let adjustedPrice;
+    // Se o produto tem price_usd, usa cotação × (1+markup); senão usa factor global sobre price BRL
+    if (p.price_usd != null && Number(p.price_usd) > 0 && rate) {
+      adjustedPrice = Math.round(Number(p.price_usd) * rate * (1 + markup) * 100) / 100;
+    } else {
+      adjustedPrice = Math.round(Number(p.price) * factor * 100) / 100;
+    }
     return { ...p, price: adjustedPrice, qty, line: adjustedPrice * qty };
   }).filter(Boolean);
   const subtotal = items.reduce((s, i) => s + i.line, 0);
@@ -228,11 +238,28 @@ async function currentPriceFactor() {
   };
 }
 
-// Aplica o fator ao preço de um produto ou lista
-function applyFactor(item, factor) {
-  if (!item || factor === 1) return item;
-  if (Array.isArray(item)) return item.map(i => applyFactor(i, factor));
+// Aplica o preço final ao produto:
+//  - Se o produto tem price_usd (preço em dólar), calcula: price_usd × cotação × (1 + markup)
+//  - Senão, aplica o fator global (cotação_hoje / referência × (1+markup)) ao price em BRL
+// pf = objeto retornado por currentPriceFactor: { factor, active, rate, markup }
+function applyFactor(item, pf) {
+  if (!item) return item;
+  if (Array.isArray(item)) return item.map(i => applyFactor(i, pf));
+  const factor = (pf && pf.factor) || (typeof pf === 'number' ? pf : 1);
+  const rate = pf && pf.rate;
+  const markup = pf && pf.markup || 0;
   const clone = { ...item };
+  // Se o produto tem preço em USD e temos cotação, converte
+  if (clone.price_usd != null && Number(clone.price_usd) > 0 && rate) {
+    const brlPrice = Number(clone.price_usd) * rate * (1 + markup);
+    clone.price = Math.round(brlPrice * 100) / 100;
+    if (clone.line != null && clone.qty != null) {
+      clone.line = Math.round(clone.price * clone.qty * 100) / 100;
+    }
+    return clone;
+  }
+  // Senão, aplica o fator global (se factor != 1)
+  if (factor === 1) return clone;
   if (clone.price != null) clone.price = Math.round(Number(clone.price) * factor * 100) / 100;
   if (clone.line != null)  clone.line  = Math.round(Number(clone.line)  * factor * 100) / 100;
   return clone;
@@ -242,31 +269,33 @@ app.use(async (req, res, next) => {
   const cart = getCart(req);
   res.locals.cartCount = cart.reduce((s, c) => s + c.qty, 0);
   res.locals.path = req.path;
-  // Disponibiliza fator do dólar para todas as views (não bate na API em rotas admin/api)
+  // Sempre busca cotação (produtos com price_usd sempre precisam dela, independente do reajuste global estar ativo)
   if (!req.path.startsWith('/admin') && !req.path.startsWith('/api/') && !req.path.startsWith('/webhook')) {
     try {
-      const pf = await currentPriceFactor();
-      res.locals.priceFactor = pf.factor;
+      let pf = await currentPriceFactor();
+      // Se o reajuste global está off mas ainda precisamos da cotação para produtos USD
+      if (!pf.active) {
+        const c = await dolar.getRate();
+        pf = { factor: 1, active: false, rate: c.rate, markup: 0 };
+      }
       res.locals.priceFactorInfo = pf;
     } catch (e) {
-      res.locals.priceFactor = 1;
-      res.locals.priceFactorInfo = { active: false };
+      res.locals.priceFactorInfo = { active: false, rate: null, markup: 0, factor: 1 };
     }
   } else {
-    res.locals.priceFactor = 1;
-    res.locals.priceFactorInfo = { active: false };
+    res.locals.priceFactorInfo = { active: false, rate: null, markup: 0, factor: 1 };
   }
   next();
 });
 
 // Wrapper que ajusta preços após query — usado nas rotas públicas
-function adjust(rows, factor) { return applyFactor(rows, factor || 1); }
+function adjust(rows, pf) { return applyFactor(rows, pf); }
 
 // ---------- Public routes ----------
 app.get('/', async (req, res) => {
   const [featured] = await pool.execute('SELECT * FROM products WHERE featured=1 ORDER BY RAND() LIMIT 8');
   const [latest] = await pool.execute('SELECT * FROM products ORDER BY created_at DESC LIMIT 4');
-  const f = res.locals.priceFactor;
+  const f = res.locals.priceFactorInfo;
   res.render('home', { featured: adjust(featured, f), latest: adjust(latest, f) });
 });
 
@@ -318,7 +347,7 @@ app.get('/categoria/:slug', async (req, res) => {
   const cat = CATEGORIES.find(c => c.slug === req.params.slug);
   if (!cat) return res.status(404).render('404');
   const [products] = await pool.execute('SELECT * FROM products WHERE category=? ORDER BY featured DESC, name', [cat.slug]);
-  const f = res.locals.priceFactor;
+  const f = res.locals.priceFactorInfo;
   res.render('category', { cat, products: adjust(products, f) });
 });
 
@@ -326,7 +355,7 @@ app.get('/produto/:id', async (req, res) => {
   const [[p]] = await pool.execute('SELECT * FROM products WHERE id=?', [req.params.id]);
   if (!p) return res.status(404).render('404');
   const [related] = await pool.execute('SELECT * FROM products WHERE category=? AND id<>? ORDER BY RAND() LIMIT 4', [p.category, p.id]);
-  const f = res.locals.priceFactor;
+  const f = res.locals.priceFactorInfo;
   res.render('product', { p: applyFactor(p, f), related: adjust(related, f) });
 });
 
@@ -359,18 +388,18 @@ app.post('/carrinho/atualizar', (req, res) => {
 });
 
 app.get('/carrinho', async (req, res) => {
-  const detail = await cartDetail(getCart(req), res.locals.priceFactor);
+  const detail = await cartDetail(getCart(req), res.locals.priceFactorInfo);
   res.render('cart', detail);
 });
 
 app.get('/checkout', async (req, res) => {
-  const detail = await cartDetail(getCart(req), res.locals.priceFactor);
+  const detail = await cartDetail(getCart(req), res.locals.priceFactorInfo);
   if (!detail.items.length) return res.redirect('/carrinho');
   res.render('checkout', detail);
 });
 
 app.post('/checkout/frete', async (req, res) => {
-  const detail = await cartDetail(getCart(req), res.locals.priceFactor);
+  const detail = await cartDetail(getCart(req), res.locals.priceFactorInfo);
   const pkg = correios.packageFromItems(detail.items);
   const quote = correios.calcShipping(req.body.cep, pkg);
   if (!quote) return res.json({ error: 'CEP inválido' });
@@ -384,7 +413,7 @@ app.post('/checkout/frete', async (req, res) => {
 });
 
 app.post('/checkout/finalizar', async (req, res) => {
-  const detail = await cartDetail(getCart(req), res.locals.priceFactor);
+  const detail = await cartDetail(getCart(req), res.locals.priceFactorInfo);
   if (!detail.items.length) return res.redirect('/carrinho');
   const { name, email, phone, cep, address, city, state, payment } = req.body;
   const shippingService = (req.body.shipping_service || 'PAC').toUpperCase();
@@ -689,23 +718,34 @@ app.get('/admin/produtos', adminAuth, async (req, res) => {
   res.render('admin/products', { products });
 });
 
-app.get('/admin/produto/novo', adminAuth, (req, res) => res.render('admin/product_form', { p: null }));
+app.get('/admin/produto/novo', adminAuth, async (req, res) => {
+  const c = await dolar.getRate().catch(() => ({ rate: null }));
+  const s = await getDolarSettings();
+  res.render('admin/product_form', { p: null, dolarRate: c.rate, dolarMarkup: s.markup });
+});
 app.get('/admin/produto/:id', adminAuth, async (req, res) => {
   const [[p]] = await pool.execute('SELECT * FROM products WHERE id=?', [req.params.id]);
   if (!p) return res.redirect('/admin/produtos');
-  res.render('admin/product_form', { p });
+  const c = await dolar.getRate().catch(() => ({ rate: null }));
+  const s = await getDolarSettings();
+  res.render('admin/product_form', { p, dolarRate: c.rate, dolarMarkup: s.markup });
 });
 
 app.post('/admin/produto/salvar', adminAuth, async (req, res) => {
   const { id, name, category, description, price, stock, image_url, featured } = req.body;
   const slug = name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
   const feat = featured ? 1 : 0;
+  // price_usd é opcional — quando definido, sobrescreve o preço BRL dinamicamente
+  const rawUsd = String(req.body.price_usd || '').replace(',', '.').trim();
+  const price_usd = rawUsd && !isNaN(parseFloat(rawUsd)) && parseFloat(rawUsd) > 0
+    ? parseFloat(rawUsd)
+    : null;
   if (id) {
-    await pool.execute('UPDATE products SET name=?, slug=?, category=?, description=?, price=?, stock=?, image_url=?, featured=? WHERE id=?',
-      [name, slug, category, description, price, stock, image_url, feat, id]);
+    await pool.execute('UPDATE products SET name=?, slug=?, category=?, description=?, price=?, price_usd=?, stock=?, image_url=?, featured=? WHERE id=?',
+      [name, slug, category, description, price, price_usd, stock, image_url, feat, id]);
   } else {
-    await pool.execute('INSERT INTO products (name,slug,category,description,price,stock,image_url,featured) VALUES (?,?,?,?,?,?,?,?)',
-      [name, slug, category, description, price, stock, image_url, feat]);
+    await pool.execute('INSERT INTO products (name,slug,category,description,price,price_usd,stock,image_url,featured) VALUES (?,?,?,?,?,?,?,?,?)',
+      [name, slug, category, description, price, price_usd, stock, image_url, feat]);
   }
   res.redirect('/admin/produtos');
 });

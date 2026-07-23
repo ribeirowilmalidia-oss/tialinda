@@ -17,13 +17,56 @@
         <% }) %>
       </select>
     </label>
-    <label>Preço (R$) <input name="price" type="number" step="0.01" min="0" value="<%= p ? p.price : '' %>" required></label>
+    <label>Preço em R$ <span class="muted" style="font-weight:400;font-size:12px">(fixo, ignorado se USD preenchido)</span>
+      <input name="price" type="number" step="0.01" min="0" value="<%= p ? p.price : '' %>" required>
+    </label>
+  </div>
+
+  <div style="background:#faf6ef;border:1px solid #e6d9c3;border-radius:12px;padding:14px 16px;margin:6px 0 14px">
+    <label style="display:block">
+      <strong>💵 Preço em dólar (US$) <span class="muted" style="font-weight:400;font-size:12px">— opcional</span></strong>
+      <input name="price_usd" id="priceUsd" type="number" step="0.01" min="0" value="<%= p && p.price_usd ? p.price_usd : '' %>" placeholder="Ex: 15.90" style="margin-top:4px">
+    </label>
+    <p class="muted" style="margin:8px 0 0;font-size:13px">
+      <% if (typeof dolarRate !== 'undefined' && dolarRate) { %>
+        Cotação atual: <strong>R$ <%= dolarRate.toFixed(4).replace('.', ',') %></strong>
+        <% if (dolarMarkup) { %>· markup: <strong><%= (dolarMarkup*100).toFixed(1) %>%</strong><% } %>
+        <br>
+        <span id="priceUsdPreview">Deixe em branco para usar apenas o preço em R$.</span>
+      <% } else { %>
+        Cotação indisponível. Configure em <a href="/admin/dolar">Reajuste pelo Dólar</a>.
+      <% } %>
+    </p>
   </div>
 
   <div class="row-2">
     <label>Estoque <input name="stock" type="number" min="0" value="<%= p ? p.stock : 0 %>" required></label>
     <label class="check-label"><input type="checkbox" name="featured" value="1" <%= p && p.featured ? 'checked' : '' %>> Destacar na home</label>
   </div>
+
+  <% if (typeof dolarRate !== 'undefined' && dolarRate) { %>
+  <script>
+    (function(){
+      const rate = <%= dolarRate %>;
+      const markup = <%= dolarMarkup || 0 %>;
+      const input = document.getElementById('priceUsd');
+      const preview = document.getElementById('priceUsdPreview');
+      function update() {
+        const v = parseFloat(String(input.value).replace(',', '.'));
+        if (!v || v <= 0) {
+          preview.innerHTML = 'Deixe em branco para usar apenas o preço em R$.';
+          return;
+        }
+        const brl = v * rate * (1 + markup);
+        preview.innerHTML = 'US$ ' + v.toFixed(2) + ' × R$ ' + rate.toFixed(4).replace('.', ',') +
+          (markup ? ' × ' + (1+markup).toFixed(3) : '') +
+          ' = <strong>R$ ' + brl.toFixed(2).replace('.', ',') + '</strong> hoje';
+      }
+      input.addEventListener('input', update);
+      update();
+    })();
+  </script>
+  <% } %>
 
   <label>URL da imagem <input name="image_url" value="<%= p ? p.image_url : '' %>" placeholder="https://..."></label>
   <label>Descrição <textarea name="description" rows="5"><%= p ? p.description : '' %></textarea></label>
