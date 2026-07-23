@@ -772,6 +772,23 @@ app.post('/admin/pedido/:id/status', adminAuth, async (req, res) => {
   res.redirect('/admin/pedido/' + req.params.id);
 });
 
+// Atualiza price_usd de produtos existentes (usado quando importou antes da coluna existir)
+app.post('/admin/atualizar-usd', adminAuth, express.json({ limit: '2mb' }), async (req, res) => {
+  const items = Array.isArray(req.body) ? req.body : (req.body.items || []);
+  let updated = 0, notfound = 0;
+  for (const it of items) {
+    try {
+      const [r] = await pool.execute(
+        'UPDATE products SET price_usd=? WHERE slug=?',
+        [it.price_usd, it.slug]
+      );
+      if (r.affectedRows > 0) updated++;
+      else notfound++;
+    } catch (e) { /* ignora */ }
+  }
+  res.json({ ok: true, updated, notfound, total: items.length });
+});
+
 // Tela visual de importação em massa — cole JSON e clique importar
 app.get('/admin/importar', adminAuth, (req, res) => {
   res.render('admin/importar', { result: null, jsonInput: '' });
