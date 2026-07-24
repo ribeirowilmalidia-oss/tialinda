@@ -214,24 +214,67 @@ async function getDolarSettings() {
   }
 }
 
-// Guarda o último fator aplicado por request (evita batidas repetidas na API)
+async function upsertSetting(k, v) {
+  const [r] = await pool.execute("UPDATE settings SET v=? WHERE k=?", [String(v), k]);
+  if (!r || r.affectedRows === 0) {
+    try { await pool.execute("INSERT INTO settings (k,v) VALUES (?,?)", [k, String(v)]); } catch(e) {
+      // race: tenta update de novo
+      await pool.execute("UPDATE settings SET v=? WHERE k=?", [String(v), k]);
+    }
+  }
+}
+
+// Retorna a cotação "do mês": congela a cotação no dia 1 (ou no primeiro acesso do mês)
+// e só troca quando o YYYY-MM mudar. Assim os preços não oscilam durante o mês.
+async function getMonthlyRate() {
+  const now = new Date();
+  const ym = now.getUTCFullYear() + '-' + String(now.getUTCMonth() + 1).padStart(2, '0');
+
+  // Lê a cotação persistida
+  const [rows] = await pool.execute(
+    "SELECT k, v FROM settings WHERE k IN ('dolar_mes_atual','dolar_cotacao_mes','dolar_mes_fonte')"
+  );
+  const m = {};
+  rows.forEach(r => m[r.k] = r.v);
+  const savedYm = m.dolar_mes_atual || '';
+  const savedRate = parseFloat(m.dolar_cotacao_mes || '');
+
+  if (savedYm === ym && savedRate > 0) {
+    return { rate: savedRate, source: m.dolar_mes_fonte || 'mensal', fromCache: true, ym };
+  }
+
+  // Mês virou (ou primeira execução): busca cotação nova
+  const c = await dolar.refresh();
+  if (!c.rate) {
+    // Fallback: se não conseguiu buscar, mantém a última do mês passado
+    if (savedRate > 0) return { rate: savedRate, source: m.dolar_mes_fonte || 'mensal-stale', fromCache: true, ym: savedYm };
+    return { rate: null, source: 'erro', ym };
+  }
+  // Persiste
+  try {
+    await upsertSetting('dolar_mes_atual', ym);
+    await upsertSetting('dolar_cotacao_mes', c.rate);
+    await upsertSetting('dolar_mes_fonte', c.source || 'dolarpy');
+    await upsertSetting('dolar_ultima_cotacao', c.rate);
+    await upsertSetting('dolar_ultima_atualizacao', new Date().toISOString());
+  } catch (e) { console.error('[dolar mensal] persist:', e.message); }
+  return { rate: c.rate, source: c.source, fromCache: false, ym };
+}
+
+// Guarda o último fator aplicado por request (usa cotação mensal — sem oscilar por dia)
 async function currentPriceFactor() {
   const s = await getDolarSettings();
   if (!s.ativo || !s.referencia) return { factor: 1, active: false };
-  const c = await dolar.getRate();
+  const c = await getMonthlyRate();
   if (!c.rate) return { factor: 1, active: false, error: 'sem cotação' };
-  // Persiste cotação em cache no banco (para exibir no admin)
-  try {
-    await pool.execute("UPDATE settings SET v=? WHERE k='dolar_ultima_cotacao'", [String(c.rate)]);
-    await pool.execute("UPDATE settings SET v=? WHERE k='dolar_ultima_atualizacao'", [new Date().toISOString()]);
-  } catch (e) {}
   return {
     factor: dolar.calcFactor(c.rate, s.referencia, s.markup),
     active: true,
     rate: c.rate,
     reference: s.referencia,
     markup: s.markup,
-    source: c.source
+    source: c.source,
+    ym: c.ym
   };
 }
 
@@ -937,29 +980,23 @@ app.get('/admin/dolar', adminAuth, async (req, res) => {
   const [rows] = await pool.execute("SELECT k, v FROM settings WHERE k LIKE 'dolar_%'");
   const s = {};
   rows.forEach(r => s[r.k] = r.v);
-  const cot = await dolar.getRate().catch(() => ({ rate: null, source: 'erro' }));
+  const cotSpot = await dolar.getRate().catch(() => ({ rate: null, source: 'erro' }));
+  const cotMes = await getMonthlyRate().catch(() => ({ rate: null, source: 'erro' }));
   const referencia = parseFloat(s.dolar_referencia) || 0;
   const markup = parseFloat(s.dolar_markup) || 0;
   const ativo = s.dolar_ativo === '1';
-  const factor = (cot.rate && referencia) ? dolar.calcFactor(cot.rate, referencia, markup) : 1;
+  // Fator sempre baseado na cotação MENSAL (não spot)
+  const factor = (cotMes.rate && referencia) ? dolar.calcFactor(cotMes.rate, referencia, markup) : 1;
   res.render('admin/dolar', {
     ativo, referencia, markup,
-    cotacao: cot.rate,
-    fonte: cot.source,
+    cotacao: cotMes.rate,           // cotação usada na loja (mensal)
+    cotacaoSpot: cotSpot.rate,      // cotação de hoje (informativa)
+    mesAtual: s.dolar_mes_atual || '',
+    fonte: cotMes.source,
     factor,
     ultimaAtualizacao: s.dolar_ultima_atualizacao || ''
   });
 });
-
-async function upsertSetting(k, v) {
-  const [r] = await pool.execute("UPDATE settings SET v=? WHERE k=?", [String(v), k]);
-  if (!r || r.affectedRows === 0) {
-    try { await pool.execute("INSERT INTO settings (k,v) VALUES (?,?)", [k, String(v)]); } catch(e) {
-      // race: try update again
-      await pool.execute("UPDATE settings SET v=? WHERE k=?", [String(v), k]);
-    }
-  }
-}
 
 app.post('/admin/dolar/salvar', adminAuth, async (req, res) => {
   const ativo = req.body.ativo ? '1' : '0';
@@ -972,7 +1009,10 @@ app.post('/admin/dolar/salvar', adminAuth, async (req, res) => {
 });
 
 app.post('/admin/dolar/atualizar-agora', adminAuth, async (req, res) => {
+  // Força nova cotação mensal (limpa o mês salvo, força re-fetch)
+  await upsertSetting('dolar_mes_atual', '');
   await dolar.refresh();
+  await getMonthlyRate();
   res.redirect('/admin/dolar');
 });
 

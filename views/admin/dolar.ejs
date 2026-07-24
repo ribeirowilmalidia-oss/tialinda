@@ -1,24 +1,28 @@
 <% const title='Reajuste pelo Dólar'; %><%- include('_head') %>
 
 <header class="admin-header">
-  <h1>Reajuste diário pelo dólar</h1>
-  <p class="muted">Preços da loja atualizados automaticamente conforme a cotação USD/BRL. O preço no cadastro não muda — o ajuste é aplicado em tempo real.</p>
+  <h1>Reajuste mensal pelo dólar</h1>
+  <p class="muted">Cotação travada a cada mês (atualiza automaticamente no dia 1º). Preços da loja acompanham a cotação do mês corrente. O valor cadastrado não muda — o ajuste é aplicado em tempo real.</p>
 </header>
 
 <div class="kpi-grid">
   <div class="kpi">
-    <small>Cotação USD/BRL agora</small>
+    <small>Cotação do mês (travada)</small>
     <strong><%= cotacao ? 'R$ ' + Number(cotacao).toFixed(4).replace('.', ',') : '—' %></strong>
     <p class="muted" style="margin:6px 0 0;font-size:12px">
+      Mês: <strong><%= mesAtual || '—' %></strong> ·
       Fonte:
       <% if (fonte === 'dolarpy') { %>
-        <a href="https://www.dolarpy.com.br/" target="_blank" rel="noopener">dolarpy.com.br</a> (fronteira PY/BR)
+        <a href="https://www.dolarpy.com.br/" target="_blank" rel="noopener">dolarpy.com.br</a>
       <% } else if (fonte === 'awesomeapi') { %>
-        awesomeapi (comercial)
+        awesomeapi
       <% } else if (fonte && fonte.startsWith('bcb')) { %>
-        Banco Central (PTAX)
+        BCB (PTAX)
       <% } else { %>
-        <%= fonte || '(cache)' %>
+        <%= fonte || '—' %>
+      <% } %>
+      <% if (typeof cotacaoSpot !== 'undefined' && cotacaoSpot && cotacao && Math.abs(cotacaoSpot-cotacao)>0.001) { %>
+        <br>Cotação de hoje (informativa): R$ <%= Number(cotacaoSpot).toFixed(4).replace('.', ',') %>
       <% } %>
     </p>
   </div>
@@ -86,12 +90,12 @@
   <section class="card">
     <div class="card-head"><h2>Como funciona</h2></div>
     <ol style="line-height:1.7;padding:0 4px 4px 22px;font-size:14px">
-      <li>Cadastre os produtos com preços em BRL normalmente.</li>
-      <li>Defina a <strong>cotação de referência</strong> = valor do dólar no dia dos preços atuais.</li>
-      <li>Diariamente o site busca a cotação USD/BRL em <strong><a href="https://www.dolarpy.com.br/" target="_blank">dolarpy.com.br</a></strong> (dólar da fronteira PY/BR — o valor real de câmbio na fronteira). Fallbacks automáticos: awesomeapi e Banco Central.</li>
-      <li>O fator = cotação_hoje ÷ cotação_referência × (1 + markup).</li>
-      <li>Se dólar subir de R$ 5,50 → R$ 5,72, fator = 1,04 → toalha de R$ 89,90 vai para R$ 93,50.</li>
-      <li>A cotação fica em cache por 6h para não sobrecarregar a API.</li>
+      <li>Cadastre os produtos com preços em BRL (ou preencha <code>price_usd</code> para preços em dólar).</li>
+      <li>Defina a <strong>cotação de referência</strong> = valor do dólar no dia em que definiu os preços.</li>
+      <li><strong>Uma vez por mês</strong>, no primeiro acesso do mês (normalmente dia 1º), o site busca a cotação USD/BRL em <strong><a href="https://www.dolarpy.com.br/" target="_blank">dolarpy.com.br</a></strong> e trava esse valor até o próximo mês. Fallbacks: awesomeapi e Banco Central.</li>
+      <li>O fator = cotação_mês ÷ cotação_referência × (1 + markup).</li>
+      <li>Durante o mês inteiro os preços permanecem estáveis. No dia 1º do próximo mês, a cotação é atualizada automaticamente.</li>
+      <li>Você pode forçar uma nova cotação a qualquer momento clicando em "↻ Buscar agora".</li>
       <li>O preço no banco de dados <strong>nunca é alterado</strong>. Se desativar o reajuste, tudo volta ao normal.</li>
     </ol>
     <p class="muted" style="margin-top:14px;font-size:13px;padding:0 4px">💡 Dica: se você importa/compra em dólar, defina a referência = cotação do dia em que você comprou o estoque. Assim, se o dólar disparar, você não vende no prejuízo.</p>
