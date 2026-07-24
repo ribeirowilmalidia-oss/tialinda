@@ -278,9 +278,27 @@ async function currentPriceFactor() {
   };
 }
 
+// Arredonda para terminar em ,90 (padrão do varejo brasileiro).
+// Regra: pega a parte inteira e coloca ,90.
+//   - Se a parte fracionária <= 0,45 → cai um real e usa ,90.
+//     Ex: 149,20 → 148,90; 90,10 → 89,90
+//   - Se > 0,45 → mantém o real e usa ,90.
+//     Ex: 149,59 → 149,90; 89,50 → 89,90
+// Para valores muito baixos (< R$ 5) mantém o preço exato.
+function roundTo90(v) {
+  const n = Number(v);
+  if (!isFinite(n) || n <= 0) return n;
+  if (n < 5) return Math.round(n * 100) / 100;
+  const inteiro = Math.floor(n);
+  const frac = n - inteiro;
+  const base = frac <= 0.45 ? inteiro - 1 : inteiro;
+  return base + 0.90;
+}
+
 // Aplica o preço final ao produto:
 //  - Se o produto tem price_usd (preço em dólar), calcula: price_usd × cotação × (1 + markup)
 //  - Senão, aplica o fator global (cotação_hoje / referência × (1+markup)) ao price em BRL
+//  - Em ambos os casos, o preço final é arredondado para terminar em ,90
 // pf = objeto retornado por currentPriceFactor: { factor, active, rate, markup }
 function applyFactor(item, pf) {
   if (!item) return item;
@@ -292,16 +310,22 @@ function applyFactor(item, pf) {
   // Se o produto tem preço em USD e temos cotação, converte
   if (clone.price_usd != null && Number(clone.price_usd) > 0 && rate) {
     const brlPrice = Number(clone.price_usd) * rate * (1 + markup);
-    clone.price = Math.round(brlPrice * 100) / 100;
+    clone.price = roundTo90(brlPrice);
     if (clone.line != null && clone.qty != null) {
       clone.line = Math.round(clone.price * clone.qty * 100) / 100;
     }
     return clone;
   }
-  // Senão, aplica o fator global (se factor != 1)
-  if (factor === 1) return clone;
-  if (clone.price != null) clone.price = Math.round(Number(clone.price) * factor * 100) / 100;
-  if (clone.line != null)  clone.line  = Math.round(Number(clone.line)  * factor * 100) / 100;
+  // Senão, aplica o fator global (arredondando também)
+  if (clone.price != null) {
+    const raw = Number(clone.price) * factor;
+    clone.price = roundTo90(raw);
+  }
+  if (clone.line != null && clone.qty != null && clone.price != null) {
+    clone.line = Math.round(clone.price * clone.qty * 100) / 100;
+  } else if (clone.line != null) {
+    clone.line = Math.round(Number(clone.line) * factor * 100) / 100;
+  }
   return clone;
 }
 
