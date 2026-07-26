@@ -278,18 +278,20 @@ async function currentPriceFactor() {
   };
 }
 
-// Arredonda para cima para o próximo múltiplo de 5 (sempre termina em 0 ou 5).
+// Arredonda para o múltiplo de 5 MAIS PRÓXIMO (sempre termina em 0 ou 5).
+// Regra: se a distância pro próximo múltiplo de 5 for <= 2, vai pra baixo; > 2 vai pra cima.
+//   Ex: 400,02 → 400,00
+//   Ex: 402,00 → 400,00
+//   Ex: 402,50 → 405,00
 //   Ex: 123,40 → 125,00
 //   Ex: 89,90  → 90,00
-//   Ex: 91,10  → 95,00
-//   Ex: 100,00 → 100,00 (já é múltiplo de 5)
 //   Ex: 149,59 → 150,00
 // Para valores muito baixos (< R$ 5) mantém o preço exato.
 function roundTo90(v) {
   const n = Number(v);
   if (!isFinite(n) || n <= 0) return n;
   if (n < 5) return Math.round(n * 100) / 100;
-  return Math.ceil(n / 5) * 5;
+  return Math.round(n / 5) * 5;
 }
 
 // Aplica o preço final ao produto:
