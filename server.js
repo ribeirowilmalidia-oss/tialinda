@@ -894,6 +894,9 @@ app.post('/admin/atualizar-usd', adminAuth, express.json({ limit: '2mb' }), asyn
         sets.push('color_hex=?'); vals.push(ch);
       }
       if (it.family !== undefined) { sets.push('family=?'); vals.push(it.family ? String(it.family).slice(0,120) : null); }
+      if (it.name !== undefined) { sets.push('name=?'); vals.push(String(it.name).slice(0,200)); }
+      if (it.description !== undefined) { sets.push('description=?'); vals.push(String(it.description).slice(0,4000)); }
+      if (it.new_slug !== undefined) { sets.push('slug=?'); vals.push(String(it.new_slug).slice(0,200)); }
       if (!sets.length) continue;
       vals.push(it.slug);
       const [r] = await pool.execute(
