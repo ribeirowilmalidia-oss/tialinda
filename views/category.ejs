@@ -11,6 +11,28 @@
 <section class="wrap section">
   <% if (products.length === 0) { %>
     <p class="empty">Nenhum produto cadastrado nesta categoria ainda.</p>
+  <% } else if (cat.slug === 'perfumaria') {
+       const groups = [
+         { key: 'FEMININO',  label: 'Perfumes Femininos'  },
+         { key: 'MASCULINO', label: 'Perfumes Masculinos' },
+         { key: 'UNISEX',    label: 'Perfumes Unisex'     }
+       ];
+       const other = products.filter(p => !p.size || !['FEMININO','MASCULINO','UNISEX'].includes(String(p.size).toUpperCase()));
+  %>
+    <% groups.forEach(g => { const list = products.filter(p => String(p.size||'').toUpperCase() === g.key); %>
+      <% if (list.length) { %>
+        <h2 class="perf-group-title"><%= g.label %> <small class="muted" style="font-weight:400;font-size:14px">· <%= list.length %></small></h2>
+        <div class="prod-grid" style="margin-bottom:36px">
+          <% list.forEach(p => { %><%- include('partials/card', { p }) %><% }) %>
+        </div>
+      <% } %>
+    <% }) %>
+    <% if (other.length) { %>
+      <h2 class="perf-group-title">Outros</h2>
+      <div class="prod-grid">
+        <% other.forEach(p => { %><%- include('partials/card', { p }) %><% }) %>
+      </div>
+    <% } %>
   <% } else { %>
     <div class="prod-grid">
       <% products.forEach(p => { %>

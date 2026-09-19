@@ -979,14 +979,19 @@ app.post('/admin/importar', adminAuth, express.json({ limit: '4mb' }), async (re
       const slug = p.old_id ? `${baseSlug}-${p.old_id}` : baseSlug;
       const [existing] = await pool.execute('SELECT id FROM products WHERE slug=?', [slug]);
       if (existing && existing.length) { skipped++; continue; }
+      const rawUsd = p.price_usd != null ? parseFloat(String(p.price_usd).replace(',','.')) : null;
+      const price_usd = rawUsd && rawUsd > 0 ? rawUsd : null;
+      const size = p.size ? String(p.size).trim().toUpperCase().slice(0,20) : null;
       await pool.execute(
-        'INSERT INTO products (name, slug, category, description, price, stock, image_url, featured) VALUES (?,?,?,?,?,?,?,?)',
+        'INSERT INTO products (name, slug, category, description, price, price_usd, size, stock, image_url, featured) VALUES (?,?,?,?,?,?,?,?,?,?)',
         [
           String(p.name||'').slice(0,200),
           slug,
           String(p.category||'cama').slice(0,40),
           String(p.description||'').slice(0,2000),
           Number(p.price)||0,
+          price_usd,
+          size,
           parseInt(p.stock,10)||0,
           String(p.image_url||'').slice(0,500),
           p.featured ? 1 : 0
